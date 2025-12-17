@@ -114,7 +114,30 @@ Nginx 负责把用户的请求转发给前端文件或后端接口。
 
 ---
 
-## �💡 常见问题速查
+## 🔒 场景六：域名与 HTTPS (解决“不安全”报错)
+如果您有域名 (如 `aeo-space.com`)，请不要使用自签名证书，因为会被浏览器拦截。请使用 Let's Encrypt 申请免费的正版证书。
+
+1. **修改 Nginx 配置**:
+   ```bash
+   sudo nano /etc/nginx/sites-available/default
+   ```
+   *将 `server_name` 修改为您的域名，去掉旧的 ssl 配置，具体参考项目中的 `NGINX_CONFIG.md`。*
+
+2. **安装 Certbot 工具**:
+   ```bash
+   sudo apt update
+   sudo apt install -y certbot python3-certbot-nginx
+   ```
+
+3. **一键申请证书并配置**:
+   ```bash
+   sudo certbot --nginx -d aeo-space.com -d www.aeo-space.com
+   ```
+   *按提示输入邮箱，同意协议 (A)，成功后它会自动修改 Nginx 配置。*
+
+---
+
+## 💡 常见问题速查
 
 1. **网页白屏？**
    - 检查是否执行了 `npm run build`。

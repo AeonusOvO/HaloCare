@@ -13,25 +13,36 @@ npm run build
 ```
 成功后，会生成一个 `dist` 文件夹。这是浏览器真正能运行的文件。
 
-## 2. 配置 Nginx
-请修改您的 Nginx 配置文件（通常在 `/etc/nginx/nginx.conf` 或 `/etc/nginx/conf.d/halocare.conf`）。
+## 2. 配置 Nginx (HTTPS + 域名)
+请修改您的 Nginx 配置文件（通常在 `/etc/nginx/sites-available/default`）。
 
-请参考以下完整配置：
+请参考以下完整配置 (适配 Certbot 自动管理 SSL)：
 
 ```nginx
 server {
-    listen 443 ssl;
-    server_name 47.243.138.134; # 您的公网 IP 或域名
-
-    # SSL 证书路径 (请替换为您实际的证书路径)
-    ssl_certificate /path/to/your/certificate.crt; 
-    ssl_certificate_key /path/to/your/private.key;
+    server_name aeo-space.com www.aeo-space.com; # 您的域名
 
     # 1. 前端静态文件 (指向 dist 目录)
     location / {
-        root /path/to/your/project/dist; # !!! 注意这里要指向 dist 目录 !!!
+        root /var/www/HaloCare/dist; # !!! 注意这里要指向 dist 目录 !!!
         index index.html;
         try_files $uri $uri/ /index.html; # 支持 React 路由刷新
+        
+        # 显式定义 MIME 类型，防止 .js 文件报 404 或类型错误
+        types {
+            text/html html htm shtml;
+            text/css css;
+            text/xml xml;
+            image/gif gif;
+            image/jpeg jpeg jpg;
+            application/javascript js;
+            application/atom+xml atom;
+            application/rss+xml rss;
+            font/ttf ttf;
+            font/woff woff;
+            font/woff2 woff2;
+            image/svg+xml svg;
+        }
     }
 
     # 2. 后端接口反向代理 (关键！)
@@ -44,21 +55,21 @@ server {
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
     }
-}
 
-# (可选) 强制 HTTP 转 HTTPS
-server {
-    listen 80;
-    server_name 47.243.138.134;
-    return 301 https://$host$request_uri;
+    # SSL 配置将由 Certbot 自动添加，此处不需要手动填写
 }
 ```
 
-## 3. 重启 Nginx
-修改配置后，检查语法并重启：
+## 3. 安装免费 SSL 证书 (Let's Encrypt)
+因为自签名证书会被浏览器拦截 (HSTS)，请使用 Certbot 获取正版证书：
+
 ```bash
-sudo nginx -t
-sudo systemctl restart nginx
+# 1. 安装 Certbot
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+
+# 2. 获取证书并自动配置
+sudo certbot --nginx -d aeo-space.com -d www.aeo-space.com
 ```
 
 ## 4. 确保后端在运行
