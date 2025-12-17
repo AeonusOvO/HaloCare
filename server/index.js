@@ -23,6 +23,15 @@ if (!API_KEY) {
   console.log('DASHSCOPE_API_KEY loaded successfully');
 }
 
+// Health check endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Backend is running correctly', 
+    timestamp: new Date().toISOString() 
+  });
+});
+
 app.post('/api/chat/completions', async (req, res) => {
   try {
     const { model, messages, temperature, stream, ...rest } = req.body || {};
