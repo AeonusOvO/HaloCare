@@ -13,22 +13,44 @@ npm run build
 ```
 成功后，会生成一个 `dist` 文件夹。这是浏览器真正能运行的文件。
 
-## 2. 配置 Nginx (HTTPS + 域名)
-请修改您的 Nginx 配置文件（通常在 `/etc/nginx/sites-available/default`）。
+## 2. 配置 Nginx (HTTPS + 域名 + 证书路径)
+由于 Certbot 已经成功下载了证书，但自动配置失败，我们需要手动将证书路径填入配置文件。
 
-请参考以下完整配置 (适配 Certbot 自动管理 SSL)：
+请编辑配置文件：
+```bash
+sudo nano /etc/nginx/sites-available/default
+```
+
+**请删除原来的所有内容，直接粘贴以下完整配置：**
 
 ```nginx
+# 1. HTTP 自动跳转到 HTTPS
 server {
-    server_name aeo-space.com www.aeo-space.com; # 您的域名
+    listen 80;
+    server_name aeo-space.com www.aeo-space.com;
+    return 301 https://$host$request_uri;
+}
 
-    # 1. 前端静态文件 (指向 dist 目录)
+# 2. HTTPS 主服务器
+server {
+    listen 443 ssl;
+    server_name aeo-space.com www.aeo-space.com;
+
+    # ★★★ Certbot 下载的证书路径 ★★★
+    ssl_certificate /etc/letsencrypt/live/aeo-space.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/aeo-space.com/privkey.pem;
+
+    # 推荐的安全参数 (可选)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # 前端静态文件
     location / {
-        root /var/www/HaloCare/dist; # !!! 注意这里要指向 dist 目录 !!!
+        root /var/www/HaloCare/dist;
         index index.html;
-        try_files $uri $uri/ /index.html; # 支持 React 路由刷新
-        
-        # 显式定义 MIME 类型，防止 .js 文件报 404 或类型错误
+        try_files $uri $uri/ /index.html;
+
+        # 显式定义 MIME 类型
         types {
             text/html html htm shtml;
             text/css css;
@@ -45,31 +67,22 @@ server {
         }
     }
 
-    # 2. 后端接口反向代理 (关键！)
-    # 将 /api 开头的请求转发给本地运行的 4000 端口后端
+    # 后端接口反向代理
     location /api/ {
-        proxy_pass http://localhost:4000/api/; 
+        proxy_pass http://localhost:4000/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
     }
-
-    # SSL 配置将由 Certbot 自动添加，此处不需要手动填写
 }
 ```
 
-## 3. 安装免费 SSL 证书 (Let's Encrypt)
-因为自签名证书会被浏览器拦截 (HSTS)，请使用 Certbot 获取正版证书：
-
+## 3. 重启 Nginx
 ```bash
-# 1. 安装 Certbot
-sudo apt update
-sudo apt install -y certbot python3-certbot-nginx
-
-# 2. 获取证书并自动配置
-sudo certbot --nginx -d aeo-space.com -d www.aeo-space.com
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
 ## 4. 确保后端在运行
