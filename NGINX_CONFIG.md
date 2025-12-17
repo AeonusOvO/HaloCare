@@ -49,22 +49,6 @@ server {
         root /var/www/HaloCare/dist;
         index index.html;
         try_files $uri $uri/ /index.html;
-
-        # 显式定义 MIME 类型
-        types {
-            text/html html htm shtml;
-            text/css css;
-            text/xml xml;
-            image/gif gif;
-            image/jpeg jpeg jpg;
-            application/javascript js;
-            application/atom+xml atom;
-            application/rss+xml rss;
-            font/ttf ttf;
-            font/woff woff;
-            font/woff2 woff2;
-            image/svg+xml svg;
-        }
     }
 
     # 后端接口反向代理
