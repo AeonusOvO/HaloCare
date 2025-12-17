@@ -1,0 +1,8 @@
+{
+  "name": "盒家康智慧中医",
+  "description": "基于通义千问大模型的智慧中医健康管家，提供精准中医画像、多专家会诊及AR辅助诊断功能。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
