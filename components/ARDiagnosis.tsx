@@ -66,6 +66,7 @@ const ARDiagnosis: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState(false);
+  const [cameraErrorMsg, setCameraErrorMsg] = useState('');
 
   // Diagnosis Flow State
   const [step, setStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
@@ -143,6 +144,20 @@ const ARDiagnosis: React.FC = () => {
   useEffect(() => {
     let activeStream: MediaStream | null = null;
     const startCamera = async () => {
+      // 1. Check for Secure Context (HTTPS)
+      if (!window.isSecureContext) {
+        setPermissionError(true);
+        setCameraErrorMsg('摄像头需要HTTPS安全连接，当前环境不安全。');
+        return;
+      }
+
+      // 2. Check Browser Support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setPermissionError(true);
+        setCameraErrorMsg('您的浏览器不支持摄像头调用。');
+        return;
+      }
+
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -151,9 +166,17 @@ const ARDiagnosis: React.FC = () => {
         activeStream = mediaStream;
         setStream(mediaStream);
         setPermissionError(false);
-      } catch (err) {
+        setCameraErrorMsg('');
+      } catch (err: any) {
         console.error("Camera error:", err);
         setPermissionError(true);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            setCameraErrorMsg('摄像头权限被拒绝，请允许访问。');
+        } else if (err.name === 'NotFoundError') {
+            setCameraErrorMsg('未检测到摄像头设备。');
+        } else {
+            setCameraErrorMsg('摄像头启动失败：' + (err.message || '未知错误'));
+        }
       }
     };
     if (step === DiagnosisStep.WANG && !stream) startCamera();
@@ -452,9 +475,10 @@ const ARDiagnosis: React.FC = () => {
         ) : (
            /* Fallback when no camera */
           <div className="flex flex-col h-full items-center justify-center text-stone-500 p-6 text-center">
-             <AlertCircle className="mb-4" size={48}/> 
-             <p className="text-lg font-bold mb-2">未检测到摄像头或权限被拒绝</p>
-             <p className="text-sm">请点击下方“上传照片”按钮继续</p>
+             <AlertCircle className="mb-4 text-red-500" size={48}/> 
+             <p className="text-lg font-bold mb-2 text-stone-300">无法启动摄像头</p>
+             <p className="text-sm text-stone-400 max-w-xs mb-4">{cameraErrorMsg || '未检测到摄像头或权限被拒绝'}</p>
+             <p className="text-sm bg-stone-800 px-4 py-2 rounded-lg">请点击下方 <Upload size={14} className="inline mx-1"/> 按钮上传照片</p>
           </div>
         )}
         
