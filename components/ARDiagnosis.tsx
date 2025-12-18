@@ -578,6 +578,7 @@ const ARDiagnosis: React.FC = () => {
           下一步 <ChevronRight size={16}/>
         </button>
       </div>
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 
@@ -931,7 +932,6 @@ const ARDiagnosis: React.FC = () => {
            </div>
          )}
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 
