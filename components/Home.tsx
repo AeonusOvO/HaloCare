@@ -18,7 +18,7 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
              {userProfile ? `早安，${userProfile.name}` : '早安，请完善信息'}
            </h1>
            <p className="text-stone-500 text-sm mt-1">
-             {isFamilyMode ? '正在管理：父母的健康账户' : '您的专属中医健康管家'}
+             {isFamilyMode ? '正在管理：父母的健康账户' : '您的专属中医健康管家 v1.0.1'}
            </p>
         </div>
         <button 
