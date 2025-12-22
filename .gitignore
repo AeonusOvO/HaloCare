@@ -115,3 +115,4 @@ dist
 
 # User storage
 storage/
+server/storage/
