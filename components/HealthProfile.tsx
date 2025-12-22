@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { analyzeHealthProfile } from '../services/qwenService';
 import { UserProfile } from '../types';
-import { Activity, Moon, Utensils, Droplet, Thermometer, CheckCircle2, Loader2 } from 'lucide-react';
+import { Activity, Moon, Utensils, Droplet, Thermometer, CheckCircle2, Loader2, LogOut, Users } from 'lucide-react';
+import FamilyManager from './FamilyManager';
 
 interface Props {
   onProfileUpdate: (profile: UserProfile) => void;
+  token: string;
+  user: any;
+  onLogout: () => void;
 }
 
-const HealthProfile: React.FC<Props> = ({ onProfileUpdate }) => {
-  const [step, setStep] = useState(1);
+const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout }) => {
+  const [step, setStep] = useState(1); // 1: Form, 2: Result
+  const [showFamily, setShowFamily] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
+    name: user.username || '',
     age: '',
     gender: '男',
     symptoms: [] as string[],
@@ -46,20 +51,47 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate }) => {
       const analysis = await analyzeHealthProfile(profile);
       setResult(analysis);
       onProfileUpdate({ ...profile, constitution: analysis.constitution, dietPlan: analysis.diet, schedulePlan: analysis.schedule });
+      setStep(2);
     } catch (e) {
       alert("分析失败，请重试");
     } finally {
       setLoading(false);
-      setStep(2);
     }
   };
 
-  if (step === 1) {
-    return (
-      <div className="p-6 max-w-2xl mx-auto pb-24">
-        <h2 className="text-2xl font-bold text-emerald-900 mb-6 font-serif">中医体质辨识</h2>
-        
+  return (
+    <div className="p-6 max-w-4xl mx-auto pb-24">
+      {/* Header with User Controls */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-emerald-900 font-serif">个人中心</h2>
+          <p className="text-sm text-stone-600">欢迎, {user.username}</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowFamily(!showFamily)}
+            className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg hover:bg-emerald-200"
+          >
+            <Users size={16} /> 家庭
+          </button>
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
+          >
+            <LogOut size={16} /> 退出
+          </button>
+        </div>
+      </div>
+
+      {showFamily && (
+        <div className="mb-8">
+          <FamilyManager token={token} user={user} onUpdate={() => {}} />
+        </div>
+      )}
+
+      {step === 1 ? (
         <div className="space-y-6">
+          <h3 className="text-xl font-bold text-emerald-800">中医体质辨识</h3>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
             <h3 className="text-lg font-semibold mb-4 text-emerald-800 flex items-center gap-2">
               <UserIcon /> 基本信息
@@ -138,65 +170,49 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate }) => {
             {loading ? <><Loader2 className="animate-spin" /> 正在大模型推演中...</> : '生成健康画像'}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 max-w-4xl mx-auto pb-24">
-      <div className="mb-6 flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-emerald-900 font-serif">您的健康画像</h2>
-        <button onClick={() => setStep(1)} className="text-emerald-600 underline text-sm">重新测评</button>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Activity size={120} />
-          </div>
-          <h3 className="text-emerald-200 text-sm uppercase tracking-wider mb-2">核心体质</h3>
-          <div className="text-4xl font-bold mb-4 font-serif">{result?.constitution || '平和质'}</div>
-          <p className="text-emerald-100 opacity-90 text-sm leading-relaxed mb-6">
-            {result?.analysis}
-          </p>
-          <div className="flex gap-2 text-xs">
-            <span className="bg-white/20 px-2 py-1 rounded">肝气郁结</span>
-            <span className="bg-white/20 px-2 py-1 rounded">湿热</span>
-          </div>
-        </div>
-
-        <div className="md:col-span-2 space-y-4">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
-            <div className="bg-amber-100 p-3 rounded-full h-fit text-amber-700">
-              <Utensils size={24} />
-            </div>
-            <div>
-              <h4 className="font-bold text-stone-800 mb-1">个性化食疗</h4>
-              <p className="text-stone-600 text-sm leading-relaxed">{result?.diet}</p>
-            </div>
+      ) : (
+        <div>
+          <div className="mb-6 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-emerald-900">测评结果</h2>
+            <button onClick={() => setStep(1)} className="text-emerald-600 underline text-sm">重新测评</button>
           </div>
 
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
-            <div className="bg-indigo-100 p-3 rounded-full h-fit text-indigo-700">
-              <Moon size={24} />
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="md:col-span-1 bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Activity size={120} />
+              </div>
+              <h3 className="text-emerald-200 text-sm uppercase tracking-wider mb-2">核心体质</h3>
+              <div className="text-4xl font-bold mb-4 font-serif">{result?.constitution || '平和质'}</div>
+              <p className="text-emerald-100 opacity-90 text-sm leading-relaxed mb-6">
+                {result?.analysis}
+              </p>
             </div>
-            <div>
-              <h4 className="font-bold text-stone-800 mb-1">作息调养</h4>
-              <p className="text-stone-600 text-sm leading-relaxed">{result?.schedule}</p>
-            </div>
-          </div>
 
-           <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
-            <div className="bg-rose-100 p-3 rounded-full h-fit text-rose-700">
-              <Thermometer size={24} />
-            </div>
-            <div>
-              <h4 className="font-bold text-stone-800 mb-1">忌口建议</h4>
-              <p className="text-stone-600 text-sm leading-relaxed">避免食用辛辣刺激、生冷寒凉之物。少食海鲜发物。</p>
+            <div className="md:col-span-2 space-y-4">
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
+                <div className="bg-amber-100 p-3 rounded-full h-fit text-amber-700">
+                  <Utensils size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-stone-800 mb-1">个性化食疗</h4>
+                  <p className="text-stone-600 text-sm leading-relaxed">{result?.diet}</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
+                <div className="bg-indigo-100 p-3 rounded-full h-fit text-indigo-700">
+                  <Moon size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-stone-800 mb-1">作息调养</h4>
+                  <p className="text-stone-600 text-sm leading-relaxed">{result?.schedule}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Home from './components/Home';
 import Learning from './components/Learning';
@@ -7,11 +7,51 @@ import HealthProfile from './components/HealthProfile';
 import SmartConsultation from './components/SmartConsultation';
 import ARDiagnosis from './components/ARDiagnosis';
 import AIButler from './components/AIButler';
+import Auth from './components/Auth';
+import { api } from './services/api';
 import { AppView, UserProfile } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      if (token) {
+        try {
+          const userData = await api.getMe(token);
+          setUser(userData);
+        } catch (e) {
+          console.error("Auth failed", e);
+          setToken(null);
+          localStorage.removeItem('token');
+        }
+      }
+      setLoading(false);
+    };
+    initAuth();
+  }, [token]);
+
+  const handleLogin = (newToken: string, newUser: any) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem('token', newToken);
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('token');
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  if (!token || !user) {
+    return <Auth onLogin={handleLogin} />;
+  }
 
   const renderContent = () => {
     switch (currentView) {
@@ -24,22 +64,19 @@ const App: React.FC = () => {
       case AppView.COMMUNITY:
         return <Community onChangeView={setCurrentView} />;
       case AppView.PROFILE:
-        // Profile tab currently reuses AI Butler or Health Profile? 
-        // Based on user request "我的" (Profile), usually contains settings/user info. 
-        // For now, let's point to Health Profile or a placeholder User Center.
-        // Let's reuse HealthProfile for "My Health" aspect as per previous design, 
-        // or maybe AI Butler was there? No, Layout had "BUTLER".
-        // Let's assume PROFILE tab shows the Health Profile for now.
-        return <HealthProfile onProfileUpdate={setUserProfile} />;
-        
-      // Sub-views / Legacy Views
       case AppView.HEALTH_PROFILE:
-        return <HealthProfile onProfileUpdate={setUserProfile} />;
+        return (
+          <HealthProfile 
+            onProfileUpdate={setUserProfile} 
+            token={token}
+            user={user}
+            onLogout={handleLogout}
+          />
+        );
       case AppView.CONSULTATION:
         return <SmartConsultation />;
       case AppView.BUTLER:
         return <AIButler />;
-        
       default:
         return <Home userProfile={userProfile} onChangeView={setCurrentView} />;
     }
