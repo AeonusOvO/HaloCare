@@ -137,7 +137,37 @@ Nginx 负责把用户的请求转发给前端文件或后端接口。
 
 ---
 
-## 💡 常见问题速查
+## � 场景七：本地开发与代码同步 (GitHub 操作)
+当您在本地电脑 (Windows/Mac) 修改完代码后，需要将其上传到 GitHub 仓库，以便服务器拉取更新。
+
+### 0. 首次配置 (如果没配过)
+告诉 Git 您是谁（只需执行一次）：
+```bash
+git config --global user.name "AeonusOvO"
+git config --global user.email "YCG13585928550@126.com"
+```
+
+### 1. 提交更改三部曲 (最常用)
+在 VS Code 终端中执行：
+```bash
+# 1. 添加所有更改
+git add .
+
+# 2. 提交更改并写备注
+git commit -m "描述您修改了什么"
+# 例如: git commit -m "修复AI辨证拍照无反应的问题"
+
+# 3. 推送到 GitHub
+git push origin master
+```
+
+### 2. 常见问题
+- 如果 `git push` 报错提示冲突，先执行 `git pull` 拉取最新代码，解决冲突后再推送。
+- 如果提示 LF/CRLF 警告，直接忽略即可，不影响使用。
+
+---
+
+## �💡 常见问题速查
 
 1. **网页白屏？**
    - 检查是否执行了 `npm run build`。
