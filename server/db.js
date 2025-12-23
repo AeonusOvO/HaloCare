@@ -188,5 +188,36 @@ export const db = {
     await this.updateUser(targetUserId, { role: newRole });
     
     return family;
+  },
+
+  // Diagnosis History Management
+  async addDiagnosis(userId, diagnosisRecord) {
+    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
+    let history = [];
+    if (await fs.pathExists(historyPath)) {
+      history = await fs.readJson(historyPath);
+    }
+    
+    // Ensure the new record is at the beginning
+    history.unshift(diagnosisRecord);
+    await fs.writeJson(historyPath, history);
+    return diagnosisRecord;
+  },
+
+  async getDiagnosisHistory(userId) {
+    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
+    if (!await fs.pathExists(historyPath)) {
+      return [];
+    }
+    return await fs.readJson(historyPath);
+  },
+
+  async deleteDiagnosis(userId, recordId) {
+    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
+    if (!await fs.pathExists(historyPath)) return;
+    
+    let history = await fs.readJson(historyPath);
+    history = history.filter(item => item.id !== recordId);
+    await fs.writeJson(historyPath, history);
   }
 };

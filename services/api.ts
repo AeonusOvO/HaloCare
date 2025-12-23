@@ -110,5 +110,36 @@ export const api = {
     });
     if (!res.ok) throw await res.json();
     return res.json();
+  },
+
+  // Diagnosis
+  async getDiagnosisHistory(token) {
+    const res = await fetch(`${API_BASE}/diagnosis`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async saveDiagnosis(token, diagnosis) {
+    const res = await fetch(`${API_BASE}/diagnosis`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(diagnosis)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async deleteDiagnosis(token, id) {
+    const res = await fetch(`${API_BASE}/diagnosis/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
   }
 };

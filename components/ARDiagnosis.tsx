@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
 import { callQwen } from '../services/qwenService';
+import { api } from '../services/api';
 import { Message } from '../types';
 
 // Steps of the TCM Diagnosis Flow
@@ -100,18 +101,21 @@ const ARDiagnosis: React.FC = () => {
 
   // Load history on mount
   useEffect(() => {
-    const saved = localStorage.getItem('tcm_diagnosis_history');
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load history", e);
-      }
-    }
+    const loadHistory = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const data = await api.getDiagnosisHistory(token);
+            setHistory(data);
+        } catch (e) {
+            console.error("Failed to load history", e);
+        }
+    };
+    loadHistory();
   }, []);
 
   // Save to history helper
-  const saveToHistory = (parsedReport: DiagnosisReport) => {
+  const saveToHistory = async (parsedReport: DiagnosisReport) => {
     const newItem: HistoryItem = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
@@ -120,17 +124,33 @@ const ARDiagnosis: React.FC = () => {
       images: images // Save images for reference
     };
     
-    const updatedHistory = [newItem, ...history];
-    setHistory(updatedHistory);
-    localStorage.setItem('tcm_diagnosis_history', JSON.stringify(updatedHistory));
+    // Optimistic update
+    setHistory([newItem, ...history]);
+    
+    const token = localStorage.getItem('token');
+    if (token) {
+        try {
+            await api.saveDiagnosis(token, newItem);
+        } catch(e) {
+            console.error("Failed to save history to server", e);
+        }
+    }
   };
 
-  const deleteHistory = (id: string, e: React.MouseEvent) => {
+  const deleteHistory = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('确定要删除这条诊断记录吗？')) {
       const updatedHistory = history.filter(item => item.id !== id);
       setHistory(updatedHistory);
-      localStorage.setItem('tcm_diagnosis_history', JSON.stringify(updatedHistory));
+      
+      const token = localStorage.getItem('token');
+      if (token) {
+          try {
+              await api.deleteDiagnosis(token, id);
+          } catch(e) {
+              console.error("Failed to delete history", e);
+          }
+      }
     }
   };
 

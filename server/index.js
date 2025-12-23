@@ -135,6 +135,39 @@ app.post('/api/family/role', authenticateToken, async (req, res) => {
   }
 });
 
+// --- Diagnosis History Routes ---
+app.get('/api/diagnosis', authenticateToken, async (req, res) => {
+  try {
+    const history = await db.getDiagnosisHistory(req.user.id);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/diagnosis', authenticateToken, async (req, res) => {
+  try {
+    const record = req.body;
+    // Basic validation
+    if (!record || !record.diagnosis) {
+      return res.status(400).json({ error: 'Invalid diagnosis record' });
+    }
+    const savedRecord = await db.addDiagnosis(req.user.id, record);
+    res.json(savedRecord);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/diagnosis/:id', authenticateToken, async (req, res) => {
+  try {
+    await db.deleteDiagnosis(req.user.id, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- File Upload ---
 const storage = multer.diskStorage({
   destination: async function (req, file, cb) {
