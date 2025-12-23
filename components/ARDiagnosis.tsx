@@ -78,10 +78,61 @@ const SlideTransition: React.FC<{
   );
 };
 
+// Simple WAV Encoder Helper
+const encodeWAV = (samples: Float32Array, sampleRate: number) => {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  // RIFF identifier
+  writeString(view, 0, 'RIFF');
+  // file length
+  view.setUint32(4, 36 + samples.length * 2, true);
+  // RIFF type
+  writeString(view, 8, 'WAVE');
+  // format chunk identifier
+  writeString(view, 12, 'fmt ');
+  // format chunk length
+  view.setUint32(16, 16, true);
+  // sample format (raw)
+  view.setUint16(20, 1, true);
+  // channel count
+  view.setUint16(22, 1, true);
+  // sample rate
+  view.setUint32(24, sampleRate, true);
+  // byte rate (sample rate * block align)
+  view.setUint32(28, sampleRate * 2, true);
+  // block align (channel count * bytes per sample)
+  view.setUint16(32, 2, true);
+  // bits per sample
+  view.setUint16(34, 16, true);
+  // data chunk identifier
+  writeString(view, 36, 'data');
+  // data chunk length
+  view.setUint32(40, samples.length * 2, true);
+
+  const floatTo16BitPCM = (output: DataView, offset: number, input: Float32Array) => {
+    for (let i = 0; i < input.length; i++, offset += 2) {
+      let s = Math.max(-1, Math.min(1, input[i]));
+      s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      output.setInt16(offset, s, true);
+    }
+  };
+
+  floatTo16BitPCM(view, 44, samples);
+
+  return buffer;
+};
+
 const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v5-SmartTransition");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v7-WavAudio");
   }, []);
 
   // ... (Camera & Stream State, Data State, Result State, History State remain unchanged)
@@ -373,7 +424,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       fileInputRef.current?.click();
   };
 
-  // --- Voice Input Logic (Web Speech API + MediaRecorder) ---
+  // --- Voice Input Logic (Web Speech API + Manual WAV Recording) ---
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioDataRef = useRef<Float32Array[]>([]);
+
   const toggleSpeechToText = () => {
     if (isListening) {
       setIsListening(false);
@@ -407,39 +463,72 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const startRecording = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
         
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) {
-                audioChunksRef.current.push(e.data);
-            }
+        // Use AudioContext for raw PCM access to encode as WAV
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
+        
+        const source = audioContext.createMediaStreamSource(stream);
+        mediaStreamSourceRef.current = source;
+        
+        // Buffer size 4096, 1 input channel, 1 output channel
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        processorRef.current = processor;
+        
+        audioDataRef.current = [];
+        
+        processor.onaudioprocess = (e) => {
+            const channelData = e.inputBuffer.getChannelData(0);
+            audioDataRef.current.push(new Float32Array(channelData));
         };
         
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-                const base64String = (reader.result as string).split(',')[1];
-                setAudioBase64(base64String);
-            };
-            stream.getTracks().forEach(track => track.stop());
-        };
+        source.connect(processor);
+        processor.connect(audioContext.destination); // Needed for Chrome to run the processor
         
-        mediaRecorder.start();
         setIsRecording(true);
     } catch (err) {
+        console.error("Recording error:", err);
         alert("无法启动录音: " + err);
     }
   };
 
   const stopRecording = () => {
-      if (mediaRecorderRef.current && isRecording) {
-          mediaRecorderRef.current.stop();
-          setIsRecording(false);
+      if (!isRecording) return;
+      
+      // Cleanup Audio Nodes
+      if (processorRef.current && mediaStreamSourceRef.current) {
+          mediaStreamSourceRef.current.disconnect();
+          processorRef.current.disconnect();
+          processorRef.current.onaudioprocess = null;
       }
+      
+      if (audioContextRef.current) {
+          const sampleRate = audioContextRef.current.sampleRate;
+          
+          // Flatten audio data
+          const totalLength = audioDataRef.current.reduce((acc, chunk) => acc + chunk.length, 0);
+          const result = new Float32Array(totalLength);
+          let offset = 0;
+          for (const chunk of audioDataRef.current) {
+              result.set(chunk, offset);
+              offset += chunk.length;
+          }
+          
+          // Encode to WAV
+          const wavBuffer = encodeWAV(result, sampleRate);
+          
+          // Convert to Base64
+          const reader = new FileReader();
+          reader.readAsDataURL(new Blob([wavBuffer], { type: 'audio/wav' }));
+          reader.onloadend = () => {
+              const base64String = (reader.result as string).split(',')[1];
+              setAudioBase64(base64String);
+          };
+          
+          audioContextRef.current.close();
+      }
+      
+      setIsRecording(false);
   };
 
   const toggleRecording = () => {
@@ -1025,7 +1114,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 <>
                 {/* Flowchart Visualization */}
                 <div className="w-full max-w-2xl mx-auto mb-8">
-                    <div className="relative flex justify-between items-center z-10">
+                    <div className="relative z-0 flex justify-between items-center">
                         {/* Progress Bar Background */}
                         <div className="absolute top-1/2 left-0 w-full h-1 bg-stone-800 -z-10 -translate-y-1/2 rounded-full"></div>
                         {/* Active Progress Bar */}
@@ -1035,7 +1124,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         ></div>
 
                         {/* Step 1: Connect */}
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${analysisProgress >= 25 ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : 'bg-stone-900 border-stone-700 text-stone-600'}`}>
                                 <Zap size={18} />
                             </div>
@@ -1043,7 +1132,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 2: Wang (Vision) */}
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wang === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <ScanEye size={18} />
                             </div>
@@ -1051,7 +1140,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 3: Wen (Audio) */}
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wen === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wen === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <Ear size={18} />
                             </div>
@@ -1059,7 +1148,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 4: Summary */}
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${realtimeContent ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'success' && stepStatus.wen === 'success' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <Activity size={18} />
                             </div>

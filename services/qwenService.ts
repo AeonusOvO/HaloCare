@@ -221,7 +221,7 @@ export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescript
       type: 'input_audio', 
       input_audio: { 
         data: audioBase64, 
-        format: 'webm' 
+        format: 'wav' 
       } 
     }
   ];
