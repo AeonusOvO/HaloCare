@@ -1,6 +1,11 @@
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  content: string | Array<{ 
+    type: string; 
+    text?: string; 
+    image_url?: { url: string };
+    input_audio?: { data: string; format?: string };
+  }>;
   reasoning_content?: string;
 }
 

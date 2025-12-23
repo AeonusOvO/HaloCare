@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
-import { callQwen } from '../services/qwenService';
+import { callQwen, analyzeImageWithQwenVL, analyzeAudioWithQwenOmni, generateFinalDiagnosis } from '../services/qwenService';
 import { api } from '../services/api';
 import { Message } from '../types';
 
@@ -89,6 +89,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState(false);
   const [cameraErrorMsg, setCameraErrorMsg] = useState('');
@@ -99,8 +102,19 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   
   // Data State
   const [images, setImages] = useState<{ face: string | null, tongue: string | null }>({ face: null, tongue: null });
-  const [wenAudioText, setWenAudioText] = useState('');
-  const [isListening, setIsListening] = useState(false);
+  const [wenAudioText, setWenAudioText] = useState(''); // User manual description
+  const [audioBase64, setAudioBase64] = useState<string | null>(null); // Recorded audio
+  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false); // Legacy flag for speech recognition visual
+  
+  // Intermediate Analysis Results
+  const [wangResult, setWangResult] = useState<string>('');
+  const [wenResult, setWenResult] = useState<string>('');
+  const [stepStatus, setStepStatus] = useState<{
+    wang: 'idle' | 'loading' | 'success' | 'error',
+    wen: 'idle' | 'loading' | 'success' | 'error'
+  }>({ wang: 'idle', wen: 'idle' });
+
   const [inquiryData, setInquiryData] = useState({
     hanRe: '', // Cold/Hot
     han: '',   // Sweat
@@ -358,8 +372,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       fileInputRef.current?.click();
   };
 
-  // --- Voice Input Logic (Web Speech API) ---
-  const toggleListening = () => {
+  // --- Voice Input Logic (Web Speech API + MediaRecorder) ---
+  const toggleSpeechToText = () => {
     if (isListening) {
       setIsListening(false);
       return;
@@ -389,6 +403,52 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
+  const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                audioChunksRef.current.push(e.data);
+            }
+        };
+        
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+                const base64String = (reader.result as string).split(',')[1];
+                setAudioBase64(base64String);
+            };
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        setIsRecording(true);
+    } catch (err) {
+        alert("无法启动录音: " + err);
+    }
+  };
+
+  const stopRecording = () => {
+      if (mediaRecorderRef.current && isRecording) {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+      }
+  };
+
+  const toggleRecording = () => {
+      if (isRecording) {
+          stopRecording();
+      } else {
+          startRecording();
+      }
+  };
+
   // --- Analysis Logic ---
   const startAnalysis = async () => {
     changeStep(DiagnosisStep.ANALYSIS);
@@ -397,64 +457,26 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     setIsConnected(false);
     setError(null);
     
-    const userPromptText = `
-    我正在进行中医“望闻问切”综合诊断。请根据以下信息进行辨证分析：
-
-    1. 【望诊】(参考上传的图片):
-       - 请分析面色、神态。
-       - 请分析舌质、舌苔。
-    
-    2. 【闻诊】(声音/气味/咳嗽描述):
-       ${wenAudioText || '用户未提供详细描述，请根据其他信息推断。'}
-
-    3. 【问诊】(十问歌):
-       - 寒热: ${inquiryData.hanRe}
-       - 汗液: ${inquiryData.han}
-       - 头身: ${inquiryData.touShen}
-       - 二便: ${inquiryData.bian}
-       - 饮食: ${inquiryData.yinShi}
-       - 胸腹: ${inquiryData.xiong}
-       - 口渴/听力: ${inquiryData.ke}
-       - 其他: ${inquiryData.other}
-
-    4. 【切诊】(脉象):
-       ${qieData || '由于线上限制，无脉象数据。请基于望闻问三诊进行推断。'}
-
-    请务必严格按照以下 JSON 格式输出诊断结果，不要包含任何 markdown 标记（如 \`\`\`json 或 \`\`\`），直接返回纯 JSON 字符串。JSON 结构如下：
-    {
-      "diagnosis": "核心辨证结论",
-      "pathology": "核心病机分析",
-      "suggestions": {
-        "diet": "饮食调理建议",
-        "lifestyle": "作息与运动建议",
-        "acupoints": "推荐穴位及按摩方法"
-      }
-    }
-    `;
-
-    const contentParts: any[] = [{ type: 'text', text: userPromptText }];
-    
-    if (images.face) contentParts.push({ type: 'image_url', image_url: { url: images.face } });
-    if (images.tongue) contentParts.push({ type: 'image_url', image_url: { url: images.tongue } });
-
     try {
-      const messages: Message[] = [{ role: 'user', content: contentParts }];
-      
       let finalContent = '';
       let finalReasoning = '';
       
-      // Use streaming to show progress
-      const res = await callQwen(
-        messages, 
-        'qwen-vl-max', // Corrected model
-        0.7, 
+      // Ensure we have results or at least wait a bit if they are loading?
+      // For now we pass the current state.
+      
+      const res = await generateFinalDiagnosis(
+        wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
+        wenResult || "（系统提示：闻诊分析尚未生成）",
+        wenAudioText,
+        inquiryData,
+        qieData,
         (content, reasoning) => {
           finalContent = content;
           finalReasoning = reasoning;
           setRealtimeContent(content);
           setRealtimeReasoning(reasoning);
         },
-        () => setIsConnected(true) // onConnect
+        () => setIsConnected(true)
       );
       
       // Double check in case stream loop returned early
@@ -711,7 +733,22 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                   setWangType('tongue');
                   return;
               }
+              
               changeStep(DiagnosisStep.WEN_AUDIO);
+              
+              // Trigger background Wang Analysis
+              if (stepStatus.wang === 'idle' || stepStatus.wang === 'error') {
+                  setStepStatus(prev => ({ ...prev, wang: 'loading' }));
+                  analyzeImageWithQwenVL(images.face, images.tongue)
+                    .then(res => {
+                        setWangResult(res.content);
+                        setStepStatus(prev => ({ ...prev, wang: 'success' }));
+                    })
+                    .catch(e => {
+                        console.error("Wang Analysis Failed", e);
+                        setStepStatus(prev => ({ ...prev, wang: 'error' }));
+                    });
+              }
           }}
           className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
         >
@@ -736,26 +773,44 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         <h3 className="text-2xl font-serif font-bold text-emerald-900 mb-2 flex items-center gap-2">
            <Ear className="text-emerald-600"/> 闻诊 · 听声息
         </h3>
-        <p className="text-stone-500 mb-8 text-sm">中医闻诊包括听声音和嗅气味。请描述您的声音变化（如嘶哑、低弱）、咳嗽声音特点，以及是否有特殊的口气或体味。</p>
+        <p className="text-stone-500 mb-8 text-sm">请录制一段您的说话声音（如读一段文字）和几次咳嗽声，供AI分析语调与气息。</p>
+
+        {/* Audio Recording Section */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-6">
+            <label className="block font-bold text-stone-700 mb-3 flex justify-between">
+                <span>录音采集 (Qwen-Omni 分析)</span>
+                {audioBase64 && <span className="text-emerald-600 text-xs flex items-center gap-1"><Check size={12}/> 已录制</span>}
+            </label>
+            <div className="flex flex-col items-center justify-center p-8 bg-stone-50 rounded-xl border-2 border-dashed border-stone-300">
+                <button 
+                    onClick={toggleRecording}
+                    className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)] scale-110' : (audioBase64 ? 'bg-emerald-500' : 'bg-stone-800')}`}
+                >
+                    {isRecording ? <div className="w-8 h-8 bg-white rounded"></div> : <Mic size={32} className="text-white"/>}
+                </button>
+                <p className="mt-4 text-sm text-stone-500 font-medium">
+                    {isRecording ? '正在录音... 点击停止' : (audioBase64 ? '录音完成，可点击重录' : '点击开始录音')}
+                </p>
+            </div>
+        </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-           <label className="block font-bold text-stone-700 mb-3">语音/气息描述</label>
+           <label className="block font-bold text-stone-700 mb-3">补充描述 (主观感受)</label>
            <div className="relative">
              <textarea 
                 value={wenAudioText}
                 onChange={e => setWenAudioText(e.target.value)}
                 placeholder="例如：最近说话声音比较小，感觉气短。咳嗽声音很重，有痰鸣声。早起口苦口臭..."
-                className="w-full p-4 pb-12 bg-stone-50 border border-stone-300 rounded-xl min-h-[200px] focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full p-4 pb-12 bg-stone-50 border border-stone-300 rounded-xl min-h-[120px] focus:ring-2 focus:ring-emerald-500 outline-none"
              />
              <button 
-               onClick={toggleListening}
+               onClick={toggleSpeechToText}
                className={`absolute bottom-4 right-4 p-2 rounded-full transition-all ${isListening ? 'bg-red-500 animate-pulse text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-               title="语音输入"
+               title="语音转文字"
              >
-               {isListening ? <MicOff size={20}/> : <Mic size={20}/>}
+               {isListening ? <MicOff size={20}/> : <MessageSquare size={20}/>}
              </button>
            </div>
-           {isListening && <p className="text-xs text-red-500 mt-2">正在聆听... (请大声说话)</p>}
         </div>
 
         <div className="mt-8 flex justify-end gap-4">
@@ -766,7 +821,28 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             上一步
           </button>
           <button 
-            onClick={() => changeStep(DiagnosisStep.WEN_INQUIRY)}
+            onClick={() => {
+                changeStep(DiagnosisStep.WEN_INQUIRY);
+                
+                // Trigger background Wen Analysis
+                if (audioBase64) {
+                    if (stepStatus.wen === 'idle' || stepStatus.wen === 'error') {
+                        setStepStatus(prev => ({ ...prev, wen: 'loading' }));
+                        analyzeAudioWithQwenOmni(audioBase64, wenAudioText)
+                            .then(res => {
+                                setWenResult(res.content);
+                                setStepStatus(prev => ({ ...prev, wen: 'success' }));
+                            })
+                            .catch(e => {
+                                console.error("Wen Analysis Failed", e);
+                                setStepStatus(prev => ({ ...prev, wen: 'error' }));
+                            });
+                    }
+                } else {
+                    setWenResult('用户未录制音频，仅提供了文字描述。');
+                    setStepStatus(prev => ({ ...prev, wen: 'success' }));
+                }
+            }}
             className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all flex items-center gap-2"
           >
             下一步 <ChevronRight size={18} />

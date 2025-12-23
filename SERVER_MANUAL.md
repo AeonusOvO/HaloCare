@@ -171,6 +171,67 @@ git push
 
 ---
 
-## 7. 联系方式
-- **运维负责人**: 姚晨光
-- **紧急联系邮箱**: YCG13585928550@126.com
+## 8. 移动端 App 维护 (Android App Maintenance)
+
+本项目使用 **Capacitor** 将 Web 应用打包为 Android App。以下操作均在 **本地 Windows 开发环境** 进行，无需在服务器上执行。
+
+### 8.1 环境准备
+确保本地已安装：
+- **Node.js**
+- **Android Studio** (需安装 Android SDK 和 Virtual Device)
+- **Java JDK** (通常 Android Studio 会自带)
+
+### 8.2 首次构建 App
+如果你是第一次生成 Android App，请在项目根目录执行：
+
+```powershell
+# 1. 安装 Capacitor 依赖
+npm install @capacitor/core @capacitor/cli @capacitor/android
+
+# 2. 初始化 Capacitor (仅需一次)
+# App Name: 盒家康智慧中医
+# App ID: com.hejiakang.app
+# Web asset directory: dist
+npx cap init
+
+# 3. 构建前端资源
+npm run build
+
+# 4. 添加 Android 平台
+npx cap add android
+
+# 5. 配置权限 (重要！)
+# 修改 android/app/src/main/AndroidManifest.xml，在 <manifest> 标签内添加：
+# <uses-permission android:name="android.permission.CAMERA" />
+# <uses-permission android:name="android.permission.RECORD_AUDIO" />
+# <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+```
+
+### 8.3 日常更新流程
+当你修改了前端 React 代码（如 `App.tsx` 或 `components/` 下的文件）并希望更新 App 时：
+
+```powershell
+# 1. 重新编译前端代码
+npm run build
+
+# 2. 同步代码到 Android 项目
+npx cap sync
+
+# 3. 打开 Android Studio 进行打包
+npx cap open android
+```
+
+### 8.4 打包 APK (在 Android Studio 中)
+1. 等待底部的 **Gradle Sync** 进度条完成。
+2. 点击顶部菜单 **Build** -> **Build Bundle(s) / APK(s)** -> **Build APK(s)**。
+3. 编译完成后，右下角提示 "APK(s) generated successfully"。
+4. 点击 **locate** 即可找到生成的 `.apk` 安装包。
+
+### 8.5 常见问题 (App FAQ)
+- **摄像头无法打开**: 检查 `AndroidManifest.xml` 是否添加了权限，且手机是否在运行时授权了 App。
+- **API 请求失败**: 
+  - 确保手机网络正常。
+  - 确保后端服务器 (`halocare.life`) 正常运行且 SSL 证书有效（Android 默认禁止明文 HTTP 请求）。
+  - 如果是本地测试，手机和电脑需在同一 WiFi 下，且 API 地址需改为局域网 IP (如 `192.168.x.x`) 而非 `localhost`。
+
+---

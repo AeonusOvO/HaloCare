@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">盒家康智慧中医</string>
+    <string name="title_activity_main">盒家康智慧中医</string>
+    <string name="package_name">com.halocare.app</string>
+    <string name="custom_url_scheme">com.halocare.app</string>
+</resources>

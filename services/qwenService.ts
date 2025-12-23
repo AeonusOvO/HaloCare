@@ -3,10 +3,11 @@ const BASE_URL = '/api/chat/completions';
 
 export const callQwen = async (
   messages: Message[],
-  model: string = 'qwen-vl-max', // Corrected from qwen3-vl-plus to stable qwen-vl-max
+  model: string = 'qwen-vl-max', 
   temperature: number = 0.7,
   onStreamUpdate?: (content: string, reasoning: string) => void,
-  onConnect?: () => void
+  onConnect?: () => void,
+  extraBody?: any // Add extraBody support
 ): Promise<{ content: string; reasoning: string }> => {
   const controller = new AbortController();
   // Set a 60-second timeout to prevent indefinite hanging
@@ -18,9 +19,7 @@ export const callQwen = async (
       messages: messages,
       stream: !!onStreamUpdate,
       temperature: temperature,
-      // Removed enable_thinking as it may cause issues with the standard VL endpoint
-      // enable_thinking: true, 
-      // thinking_budget: 10240 
+      ...extraBody // Spread extraBody into the request body
     };
 
     const response = await fetch(BASE_URL, {
@@ -164,4 +163,89 @@ export const analyzeHealthProfile = async (profile: any) => {
       schedule: "建议规律作息"
     };
   }
+};
+
+// --- New AI Diagnosis Flow Helpers ---
+
+export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: string) => {
+  const content: any[] = [
+    { type: 'text', text: '请作为中医专家，分析这张面部照片和舌象照片。请详细描述面色（如苍白、潮红、萎黄）、神态（如得神、少神）、舌质（颜色、胖瘦、齿痕）和舌苔（颜色、厚薄、润燥）。' }
+  ];
+  
+  if (faceImage) content.push({ type: 'image_url', image_url: { url: faceImage } });
+  if (tongueImage) content.push({ type: 'image_url', image_url: { url: tongueImage } });
+  
+  return callQwen(
+    [{ role: 'user', content }],
+    'qwen3-vl-plus',
+    0.7,
+    undefined,
+    undefined,
+    { enable_thinking: true, thinking_budget: 81920 }
+  );
+};
+
+export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescription: string) => {
+  const content: any[] = [
+    { type: 'text', text: `请作为中医专家，分析这段音频。用户的主观描述是：“${userDescription}”。请结合音频内容，客观描述说话人的声音特征（如语调、语速、是否有气无力、嘶哑）、呼吸音（如急促、粗重）以及咳嗽声等听觉特征。重点补充用户描述中可能遗漏的听诊细节。` },
+    { 
+      type: 'input_audio', 
+      input_audio: { 
+        data: audioBase64, 
+        format: 'webm' 
+      } 
+    }
+  ];
+
+  return callQwen(
+    [{ role: 'user', content }],
+    'qwen3-omni-30b-a3b-captioner',
+    0.7
+  );
+};
+
+export const generateFinalDiagnosis = async (
+  wangResult: string,
+  wenResult: string,
+  wenUserDescription: string,
+  inquiryData: any,
+  qieData: string,
+  onStreamUpdate?: (content: string, reasoning: string) => void,
+  onConnect?: () => void
+) => {
+    const prompt = `
+    我正在进行中医“望闻问切”综合诊断。请根据以下多模态分析结果进行最终辨证：
+    
+    1. 【望诊结果】(Qwen-VL 视觉分析):
+    ${wangResult}
+    
+    2. 【闻诊结果】(Qwen-Omni 音频分析):
+    ${wenResult}
+    (用户自述: ${wenUserDescription})
+    
+    3. 【问诊数据】(十问歌):
+    ${JSON.stringify(inquiryData, null, 2)}
+    
+    4. 【切诊数据】:
+    ${qieData || '由于线上限制，无脉象数据。请基于望闻问三诊进行推断。'}
+    
+    请务必严格按照以下 JSON 格式输出诊断结果，不要包含任何 markdown 标记，直接返回纯 JSON 字符串。JSON 结构如下：
+    {
+      "diagnosis": "核心辨证结论",
+      "pathology": "核心病机分析",
+      "suggestions": {
+        "diet": "饮食调理建议",
+        "lifestyle": "作息与运动建议",
+        "acupoints": "推荐穴位及按摩方法"
+      }
+    }
+    `;
+    
+    return callQwen(
+        [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+        'qwen3-max',
+        0.7,
+        onStreamUpdate,
+        onConnect
+    );
 };
