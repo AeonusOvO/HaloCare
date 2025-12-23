@@ -1,6 +1,7 @@
 import { Message } from '../types';
 
 const BASE_URL = '/api/chat/completions';
+// const BASE_URL = 'http://localhost:4000/api/chat/completions'; // Local debug only
 
 export const callQwen = async (
   messages: Message[],
@@ -219,7 +220,7 @@ export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescript
     { 
       type: 'input_audio', 
       input_audio: { 
-        data: audioBase64, 
+        data: `data:audio/wav;base64,${audioBase64}`, 
         format: 'wav' 
       } 
     }

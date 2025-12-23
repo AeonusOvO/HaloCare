@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AppView, UserProfile } from '../types';
-import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight, Bug } from 'lucide-react';
-import { analyzeAudioWithQwenOmni } from '../services/qwenService';
+import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight } from 'lucide-react';
 
 interface Props {
   userProfile: UserProfile | null;
@@ -10,37 +9,6 @@ interface Props {
 
 const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
   const [isFamilyMode, setIsFamilyMode] = useState(false);
-  const [debugLog, setDebugLog] = useState<string>('');
-  const [isDebugging, setIsDebugging] = useState(false);
-
-  const handleTestOmni = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsDebugging(true);
-    setDebugLog('Reading file...\n');
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = (e.target?.result as string).split(',')[1];
-        setDebugLog(prev => prev + 'File read. Calling Qwen Omni API...\n');
-        
-        try {
-          const result = await analyzeAudioWithQwenOmni(base64, "Debug Test");
-          setDebugLog(prev => prev + 'Success!\n' + JSON.stringify(result, null, 2));
-        } catch (error: any) {
-          setDebugLog(prev => prev + 'Error:\n' + (error.message || JSON.stringify(error)));
-        } finally {
-          setIsDebugging(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (e: any) {
-       setDebugLog(prev => prev + 'File Read Error: ' + e.message);
-       setIsDebugging(false);
-    }
-  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 overflow-y-auto pb-24 h-full">
@@ -176,36 +144,6 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
          >
            发起会诊 <ChevronRight size={16}/>
          </button>
-      </div>
-
-      {/* DEBUG SECTION */}
-      <div className="bg-red-50 p-4 rounded-xl border border-red-200">
-          <h3 className="font-bold text-red-800 flex items-center gap-2 mb-2">
-            <Bug size={18}/> 调试工具: Qwen-Omni Captioner
-          </h3>
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-red-700">
-              上传WAV音频测试:
-            </label>
-            <input 
-              type="file" 
-              accept=".wav" 
-              onChange={handleTestOmni}
-              disabled={isDebugging}
-              className="block w-full text-sm text-slate-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-red-100 file:text-red-700
-                hover:file:bg-red-200
-              "
-            />
-            {debugLog && (
-              <div className="mt-2 p-2 bg-black text-green-400 text-xs font-mono rounded overflow-x-auto whitespace-pre-wrap max-h-60">
-                {debugLog}
-              </div>
-            )}
-          </div>
       </div>
 
     </div>
