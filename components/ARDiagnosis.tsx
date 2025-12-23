@@ -465,7 +465,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const renderIntro = () => (
     <div className="flex-1 flex flex-col bg-stone-900 text-white overflow-hidden">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-        <div className={`flex flex-col items-center transition-all duration-1000 ease-in-out ${isIntroShifted ? 'justify-start pt-10 min-h-[30vh]' : 'justify-center min-h-[80vh]'}`}>
+        <div className={`flex flex-col items-center transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isIntroShifted ? 'mt-10 mb-0' : 'mt-[25vh] mb-[25vh]'}`}>
             <div className="mb-6 p-6 bg-emerald-900/30 rounded-full border border-emerald-500/30">
                 <ScanEye size={64} className="text-emerald-400" />
             </div>
