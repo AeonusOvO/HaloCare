@@ -795,12 +795,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-           <label className="block font-bold text-stone-700 mb-3">补充描述 (主观感受)</label>
+           <label className="block font-bold text-stone-700 mb-3">补充描述 (主观感受与气味)</label>
            <div className="relative">
              <textarea 
                 value={wenAudioText}
                 onChange={e => setWenAudioText(e.target.value)}
-                placeholder="例如：最近说话声音比较小，感觉气短。咳嗽声音很重，有痰鸣声。早起口苦口臭..."
+                placeholder={'请补充【闻诊】中无法通过录音获取的信息，例如：\n1. 口气或体味（如口臭、腥臭味）\n2. 痰液的性状与气味\n3. 主观感觉（如胸闷、心悸）'}
                 className="w-full p-4 pb-12 bg-stone-50 border border-stone-300 rounded-xl min-h-[120px] focus:ring-2 focus:ring-emerald-500 outline-none"
              />
              <button 
