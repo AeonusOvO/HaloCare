@@ -248,10 +248,10 @@ export const generateFinalDiagnosis = async (
     
     以下是四诊采集的详细数据：
 
-    1. 【望诊信息】(由 Qwen-VL-Plus 视觉分析):
+    1. 【望诊信息】(由 Healon 视觉分析):
     ${wangResult}
 
-    2. 【闻诊信息】(由 Qwen-Omni 听觉分析):
+    2. 【闻诊信息】(由 Healon 听觉分析):
     ${wenResult}
     (用户补充的主观描述与气味: ${wenUserDescription})
 

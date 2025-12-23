@@ -778,7 +778,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         {/* Audio Recording Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-6">
             <label className="block font-bold text-stone-700 mb-3 flex justify-between">
-                <span>录音采集 (Qwen-Omni 分析)</span>
+                <span>录音采集 (用以Healon分析)</span>
                 {audioBase64 && <span className="text-emerald-600 text-xs flex items-center gap-1"><Check size={12}/> 已录制</span>}
             </label>
             <div className="flex flex-col items-center justify-center p-8 bg-stone-50 rounded-xl border-2 border-dashed border-stone-300">
@@ -1001,7 +1001,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     </div>
                     <div className="text-center">
                     <p className="text-xl font-bold text-emerald-100 mb-2">正在进行多模态辨证...</p>
-                    <p className="text-sm text-stone-500">Qwen-VL 大模型正在分析您的面色、舌象与问诊数据</p>
+                    <p className="text-sm text-stone-500">Healon 大模型正在分析您的面色、舌象与问诊数据</p>
                     </div>
                 </div>
                 
@@ -1009,9 +1009,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     <div className="flex items-center gap-2 text-emerald-500 mb-4 border-b border-stone-800 pb-2">
                     <Sparkles size={16} className={realtimeReasoning ? "animate-pulse" : ""}/> 
                     <span className="text-sm font-bold uppercase tracking-wider">
-                        {realtimeReasoning ? "AI 思考过程" : (
+                        {realtimeReasoning ? "Healon 思考过程" : (
                             realtimeContent ? "正在生成诊断报告..." : 
-                            (isConnected ? "已连接，大模型思考中..." : "连接云端计算中...")
+                            (isConnected ? "已连接，Healon 思考中..." : "连接云端计算中...")
                         )}
                     </span>
                     </div>
@@ -1030,7 +1030,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                             <Loader2 size={14} className="animate-spin"/>
                             {realtimeContent 
                                 ? "深度推理完成，正在输出详细报告..."
-                                : (isConnected ? "Qwen-VL 正在分析图像特征..." : "正在建立安全连接 (压缩上传中)...")}
+                                : (isConnected ? "Healon 正在分析特征..." : "正在建立安全连接 (压缩上传中)...")}
                         </p>
                         </div>
                     )}
