@@ -629,44 +629,23 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // --- Analysis Logic ---
   const isRunningAnalysis = useRef(false);
 
-  useEffect(() => {
-      if (step !== DiagnosisStep.ANALYSIS) {
-          isRunningAnalysis.current = false;
-      }
-  }, [step]);
+  // REMOVED: useEffect dependency on step to trigger analysis
+  // We will trigger it directly from the button click
 
-  const triggerAnalysis = () => {
+  const triggerAnalysis = async () => {
+    if (isRunningAnalysis.current) return;
+    isRunningAnalysis.current = true;
+
+    // 1. Update UI to "Analysis" mode immediately
     changeStep(DiagnosisStep.ANALYSIS);
     setRealtimeReasoning('');
     setRealtimeContent('');
     setIsConnected(false);
     setError(null);
     setAnalysisProgress(25);
-  };
-
-  useEffect(() => {
-    if (step !== DiagnosisStep.ANALYSIS) return;
-
-    // Update Progress
-    let progress = 25;
-    if (stepStatus.wang === 'success' || stepStatus.wang === 'error') progress += 25;
-    if (stepStatus.wen === 'success' || stepStatus.wen === 'error') progress += 25;
-    setAnalysisProgress(progress);
-
-    // Check if we can start
-    const isReady = stepStatus.wang !== 'loading' && stepStatus.wen !== 'loading';
-    
-    if (isReady && !isRunningAnalysis.current && !error && !realtimeContent) {
-        runFinalDiagnosis();
-    }
-  }, [step, stepStatus, error, realtimeContent]);
-
-  const runFinalDiagnosis = async () => {
-    if (isRunningAnalysis.current) return;
-    isRunningAnalysis.current = true;
     
     try {
-      // Collect all data
+      // 2. Collect all data
       const inputData = {
           wangResult: wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
           wenResult: wenResult || "（系统提示：闻诊分析尚未生成）",
@@ -676,17 +655,26 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
           images // Pass images to persist them in the result later
       };
 
-      // Start Async Task via Context
+      // 3. Start Async Task via Context
+      console.log("Starting diagnosis task with data:", inputData);
       await startDiagnosis(inputData);
+      console.log("Diagnosis task started successfully");
       
-      // We don't need to do anything else here, the useEffect([activeTask]) will handle the UI updates
+      // The useEffect([activeTask]) will take over from here to update progress
       
     } catch (error: any) {
-      console.error(error);
+      console.error("Failed to start diagnosis:", error);
       setError(error.message || '请求失败，请检查网络连接');
       isRunningAnalysis.current = false; // Allow retry
     }
   };
+
+  useEffect(() => {
+    if (step !== DiagnosisStep.ANALYSIS) return;
+    // ... UI progress logic for legacy/fallback ...
+  }, [step, stepStatus, error, realtimeContent]);
+
+  // REMOVED: runFinalDiagnosis (logic moved to triggerAnalysis)
 
   // --- Navigation Helper ---
   const goBack = () => {
@@ -1175,26 +1163,6 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
-         {/* DEBUG BUTTON */}
-         <button 
-            onClick={() => {
-                console.log("=== DEBUG LOG ===");
-                console.log("Current Step:", step);
-                console.log("Active Task Context:", activeTask);
-                console.log("Minimized State:", minimized);
-                // Force navigate home to test capsule
-                // We need to access onChangeView from props? ARDiagnosis doesn't have it currently?
-                // Ah, ARDiagnosis is rendered by App.tsx, but doesn't receive onChangeView prop directly except inside Layout?
-                // Wait, ARDiagnosis props definition: const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
-                // It doesn't have onChangeView.
-                // We can't navigate from here easily without adding the prop.
-                console.log("Please manually click 'Home' in the sidebar to test navigation.");
-            }}
-            className="mb-4 px-4 py-2 bg-red-500 text-white rounded text-xs z-50 relative"
-         >
-            DEBUG: Print State
-         </button>
-
          {step === DiagnosisStep.ANALYSIS ? (
            <div className="flex flex-col h-full max-w-3xl mx-auto space-y-6 pt-10">
              
