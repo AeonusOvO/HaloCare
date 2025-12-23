@@ -19,6 +19,33 @@ const init = async () => {
   if (!await fs.pathExists(USER_INDEX_FILE)) {
     await fs.writeJson(USER_INDEX_FILE, {});
   }
+  
+  // Create default root user for dev/testing
+  const index = await fs.readJson(USER_INDEX_FILE);
+  if (!index['root']) {
+    console.log('Initializing default root user...');
+    const userId = 'root-dev-id';
+    const userDir = path.join(USERS_DIR, userId);
+    await fs.ensureDir(userDir);
+    await fs.ensureDir(path.join(userDir, 'photos'));
+
+    const profile = {
+      id: userId,
+      username: 'root',
+      password: 'root',
+      email: 'root@dev.local',
+      familyId: null,
+      role: 'admin',
+      joinedAt: new Date().toISOString()
+    };
+
+    await fs.writeJson(path.join(userDir, 'profile.json'), profile);
+    await fs.writeJson(path.join(userDir, 'notifications.json'), []);
+    
+    index['root'] = userId;
+    await fs.writeJson(USER_INDEX_FILE, index);
+    console.log('Root user created: username="root", password="root"');
+  }
 };
 
 init();

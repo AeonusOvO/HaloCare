@@ -99,7 +99,7 @@ const ARDiagnosis: React.FC = () => {
   // History State
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  // Load history on mount
+  // Load history on mount or when returning to intro
   useEffect(() => {
     const loadHistory = async () => {
         const token = localStorage.getItem('token');
@@ -111,8 +111,10 @@ const ARDiagnosis: React.FC = () => {
             console.error("Failed to load history", e);
         }
     };
-    loadHistory();
-  }, []);
+    if (step === DiagnosisStep.INTRO) {
+        loadHistory();
+    }
+  }, [step]);
 
   // Save to history helper
   const saveToHistory = async (parsedReport: DiagnosisReport) => {

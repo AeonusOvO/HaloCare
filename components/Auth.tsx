@@ -24,7 +24,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         onLogin(token, user);
       }
     } catch (err: any) {
-      setError(err.error || 'Authentication failed');
+      console.error("Login error:", err);
+      if (err.error) {
+          setError(err.error);
+      } else if (err.message && err.message.includes('Failed to fetch')) {
+          setError('无法连接服务器，请确认后端服务已启动 (localhost:4000)');
+      } else {
+          setError('Authentication failed: ' + (err.message || 'Unknown error'));
+      }
     }
   };
 
