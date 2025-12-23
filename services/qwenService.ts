@@ -202,21 +202,9 @@ export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: str
 };
 
 export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescription: string) => {
+  // Qwen3-Omni-30B-A3B-Captioner only supports audio input and does not accept text prompts.
+  // We will get the audio caption/analysis first, and then combine it with user description in the final diagnosis.
   const content: any[] = [
-    { type: 'text', text: `你是一位资深中医专家。请通过听觉分析这段音频，进行专业的“闻诊”分析。
-    
-请结合用户的文字描述（重点关注气味和主观感受）和音频内容，生成一份闻诊报告。
-
-1. **听声音（音频分析重点）**：
-   - **语声**：语调高低（洪亮/低微）、语速快慢、是否有气无力（少气懒言）、是否有嘶哑或鼻音。
-   - **呼吸**：呼吸声是否粗重、急促、或有哮鸣音。
-   - **咳嗽/喷嚏/呕吐**：若有，描述声音特点（如咳声重浊、干咳无痰）。
-
-2. **嗅气味与主观补充（参考用户描述）**：
-   - 用户描述内容：【${userDescription}】
-   - 请结合用户描述，分析是否有特殊的口气（如酸腐、腥臭）、体味或排泄物气味异常。
-
-请输出结构清晰的闻诊分析，区分“听到的客观特征”和“用户主诉的特征”。` },
     { 
       type: 'input_audio', 
       input_audio: { 
@@ -251,8 +239,8 @@ export const generateFinalDiagnosis = async (
     ${wangResult}
 
     2. 【闻诊信息】(由 Healon 听觉分析):
-    ${wenResult}
-    (用户补充的主观描述与气味: ${wenUserDescription})
+    - 音频特征分析: ${wenResult}
+    - 用户主观描述: ${wenUserDescription}
 
     3. 【问诊信息】(十问歌):
     ${JSON.stringify(inquiryData, null, 2)}
