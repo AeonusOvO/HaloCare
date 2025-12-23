@@ -10,6 +10,9 @@ interface Props {
 const FloatingCapsule: React.FC<Props> = ({ onChangeView }) => {
   const { activeTask, minimized, setMinimized } = useDiagnosis();
 
+  // DEBUG LOG
+  console.log("FloatingCapsule Render:", { activeTask, minimized });
+
   if (!activeTask || !minimized) return null;
 
   // Determine step text

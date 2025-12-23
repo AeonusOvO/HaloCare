@@ -1175,6 +1175,26 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
+         {/* DEBUG BUTTON */}
+         <button 
+            onClick={() => {
+                console.log("=== DEBUG LOG ===");
+                console.log("Current Step:", step);
+                console.log("Active Task Context:", activeTask);
+                console.log("Minimized State:", minimized);
+                // Force navigate home to test capsule
+                // We need to access onChangeView from props? ARDiagnosis doesn't have it currently?
+                // Ah, ARDiagnosis is rendered by App.tsx, but doesn't receive onChangeView prop directly except inside Layout?
+                // Wait, ARDiagnosis props definition: const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
+                // It doesn't have onChangeView.
+                // We can't navigate from here easily without adding the prop.
+                console.log("Please manually click 'Home' in the sidebar to test navigation.");
+            }}
+            className="mb-4 px-4 py-2 bg-red-500 text-white rounded text-xs z-50 relative"
+         >
+            DEBUG: Print State
+         </button>
+
          {step === DiagnosisStep.ANALYSIS ? (
            <div className="flex flex-col h-full max-w-3xl mx-auto space-y-6 pt-10">
              
