@@ -114,6 +114,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     wang: 'idle' | 'loading' | 'success' | 'error',
     wen: 'idle' | 'loading' | 'success' | 'error'
   }>({ wang: 'idle', wen: 'idle' });
+  const [analysisProgress, setAnalysisProgress] = useState(0);
 
   const [inquiryData, setInquiryData] = useState({
     hanRe: '', // Cold/Hot
@@ -450,19 +451,47 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   };
 
   // --- Analysis Logic ---
-  const startAnalysis = async () => {
+  const isRunningAnalysis = useRef(false);
+
+  useEffect(() => {
+      if (step !== DiagnosisStep.ANALYSIS) {
+          isRunningAnalysis.current = false;
+      }
+  }, [step]);
+
+  const triggerAnalysis = () => {
     changeStep(DiagnosisStep.ANALYSIS);
     setRealtimeReasoning('');
     setRealtimeContent('');
     setIsConnected(false);
     setError(null);
+    setAnalysisProgress(25);
+  };
+
+  useEffect(() => {
+    if (step !== DiagnosisStep.ANALYSIS) return;
+
+    // Update Progress
+    let progress = 25;
+    if (stepStatus.wang === 'success' || stepStatus.wang === 'error') progress += 25;
+    if (stepStatus.wen === 'success' || stepStatus.wen === 'error') progress += 25;
+    setAnalysisProgress(progress);
+
+    // Check if we can start
+    const isReady = stepStatus.wang !== 'loading' && stepStatus.wen !== 'loading';
+    
+    if (isReady && !isRunningAnalysis.current && !error && !realtimeContent) {
+        runFinalDiagnosis();
+    }
+  }, [step, stepStatus, error, realtimeContent]);
+
+  const runFinalDiagnosis = async () => {
+    if (isRunningAnalysis.current) return;
+    isRunningAnalysis.current = true;
     
     try {
       let finalContent = '';
       let finalReasoning = '';
-      
-      // Ensure we have results or at least wait a bit if they are loading?
-      // For now we pass the current state.
       
       const res = await generateFinalDiagnosis(
         wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
@@ -498,8 +527,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       changeStep(DiagnosisStep.REPORT);
     } catch (error: any) {
       console.error(error);
-      // Instead of resetting to QIE immediately, we show the error state
       setError(error.message || '请求失败，请检查网络连接');
+      isRunningAnalysis.current = false; // Allow retry
     }
   };
 
@@ -942,7 +971,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       </div>
 
       <button 
-        onClick={startAnalysis}
+        onClick={triggerAnalysis}
         className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all flex items-center gap-2"
       >
         <Zap size={20} className="fill-current"/> 生成四诊合参报告
@@ -984,7 +1013,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                        返回上一步
                      </button>
                      <button 
-                        onClick={startAnalysis}
+                        onClick={triggerAnalysis}
                         className="px-6 py-2 bg-red-600 hover:bg-red-500 rounded-full text-white font-bold flex items-center gap-2 transition-colors"
                      >
                        <RotateCcw size={16}/> 重试
@@ -994,14 +1023,48 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
              ) : (
                 // Loading / Streaming State
                 <>
-                <div className="flex flex-col items-center justify-center space-y-6 mb-8">
-                    <div className="relative">
-                    <div className="w-16 h-16 border-4 border-emerald-900 rounded-full"></div>
-                    <div className="w-16 h-16 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
-                    </div>
-                    <div className="text-center">
-                    <p className="text-xl font-bold text-emerald-100 mb-2">正在进行多模态辨证...</p>
-                    <p className="text-sm text-stone-500">Healon 大模型正在分析您的面色、舌象与问诊数据</p>
+                {/* Flowchart Visualization */}
+                <div className="w-full max-w-2xl mx-auto mb-8">
+                    <div className="relative flex justify-between items-center z-10">
+                        {/* Progress Bar Background */}
+                        <div className="absolute top-1/2 left-0 w-full h-1 bg-stone-800 -z-10 -translate-y-1/2 rounded-full"></div>
+                        {/* Active Progress Bar */}
+                        <div 
+                            className="absolute top-1/2 left-0 h-1 bg-emerald-500 -z-10 -translate-y-1/2 rounded-full transition-all duration-1000 ease-out"
+                            style={{ width: `${analysisProgress}%` }}
+                        ></div>
+
+                        {/* Step 1: Connect */}
+                        <div className="flex flex-col items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${analysisProgress >= 25 ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : 'bg-stone-900 border-stone-700 text-stone-600'}`}>
+                                <Zap size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${analysisProgress >= 25 ? 'text-emerald-400' : 'text-stone-600'}`}>服务连接</span>
+                        </div>
+
+                        {/* Step 2: Wang (Vision) */}
+                        <div className="flex flex-col items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wang === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <ScanEye size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${stepStatus.wang === 'success' ? 'text-emerald-400' : 'text-stone-600'}`}>望诊分析</span>
+                        </div>
+
+                        {/* Step 3: Wen (Audio) */}
+                        <div className="flex flex-col items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wen === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wen === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <Ear size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${stepStatus.wen === 'success' ? 'text-emerald-400' : 'text-stone-600'}`}>闻诊分析</span>
+                        </div>
+
+                        {/* Step 4: Summary */}
+                        <div className="flex flex-col items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${realtimeContent ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'success' && stepStatus.wen === 'success' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <Activity size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${realtimeContent ? 'text-emerald-400' : 'text-stone-600'}`}>辨证汇总</span>
+                        </div>
                     </div>
                 </div>
                 

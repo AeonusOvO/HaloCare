@@ -194,11 +194,10 @@ export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: str
   
   return callQwen(
     [{ role: 'user', content }],
-    'qwen3-vl-plus',
+    'qwen-vl-max',
     0.7,
     undefined,
-    undefined,
-    { enable_thinking: true, thinking_budget: 81920 }
+    undefined
   );
 };
 
@@ -267,13 +266,13 @@ export const generateFinalDiagnosis = async (
     
     **注意**：
     1. **拒绝套话**：不要说“建议咨询医生”之类的废话，直接给出基于当前信息的专业判断。
-    2. **辨证精准**：必须明确指出“证型”（如：心脾两虚证、肝郁脾虚证、湿热蕴结证等）。
+    2. **辨证精准**：必须明确指出“证型”。
     3. **病机分析**：详细解释为什么是这个证型？结合具体的舌象、脉象（如有）、症状进行关联分析。
     4. **调理方案**：给出的建议必须针对该证型，不要给出通用的“多喝水、多运动”。
 
     请严格按照以下 JSON 格式输出，不要包含任何 markdown 标记，直接返回纯 JSON 字符串：
     {
-      "diagnosis": "核心辨证结论（例如：脾肾阳虚证）",
+      "diagnosis": "核心辨证结论",
       "pathology": "核心病机分析（300字左右，深度解析病因病机，关联四诊信息）",
       "suggestions": {
         "diet": "针对性的食疗建议（推荐具体食材和食谱，忌口什么）",
