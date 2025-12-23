@@ -103,17 +103,21 @@ const ARDiagnosis: React.FC = () => {
   
   // History State
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Load history on mount or when returning to intro
   useEffect(() => {
     const loadHistory = async () => {
         const token = localStorage.getItem('token');
         if (!token) return;
+        setIsLoadingHistory(true);
         try {
             const data = await api.getDiagnosisHistory(token);
             setHistory(data);
         } catch (e) {
             console.error("Failed to load history", e);
+        } finally {
+            setIsLoadingHistory(false);
         }
     };
     if (step === DiagnosisStep.INTRO) {
@@ -460,38 +464,53 @@ const ARDiagnosis: React.FC = () => {
         </div>
 
         {/* History Section */}
-        {history.length > 0 && (
-            <div className="max-w-md mx-auto mt-12 border-t border-stone-800 pt-8 animate-fade-in">
+        {(history.length > 0 || isLoadingHistory) && (
+            <div className="max-w-md mx-auto mt-12 border-t border-stone-800 pt-8">
                 <h3 className="text-lg font-bold text-stone-400 mb-4 flex items-center gap-2">
                     <Clock size={18}/> 历史记录
                 </h3>
                 <div className="space-y-3">
-                    {history.map(item => (
-                        <div 
-                            key={item.id}
-                            onClick={() => viewHistoryItem(item)}
-                            className="bg-stone-800/50 hover:bg-stone-800 border border-stone-700 p-4 rounded-xl cursor-pointer transition-all flex items-center justify-between group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 bg-stone-700 rounded-lg">
-                                    <FileText size={20} className="text-emerald-500"/>
-                                </div>
-                                <div>
-                                    <p className="font-bold text-stone-200">{item.diagnosis}</p>
-                                    <p className="text-xs text-stone-500 flex items-center gap-1 mt-1">
-                                        <Calendar size={10}/>
-                                        {new Date(item.date).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
-                                    </p>
+                    {isLoadingHistory ? (
+                        // Skeleton Loading State
+                        [1, 2, 3].map((i) => (
+                             <div key={i} className="bg-stone-800/30 border border-stone-700/50 p-4 rounded-xl flex items-center justify-between animate-pulse">
+                                <div className="flex items-center gap-4 w-full">
+                                    <div className="w-10 h-10 bg-stone-700/50 rounded-lg flex-shrink-0"></div>
+                                    <div className="space-y-2 flex-1">
+                                        <div className="w-3/4 h-4 bg-stone-700/50 rounded"></div>
+                                        <div className="w-1/2 h-3 bg-stone-700/30 rounded"></div>
+                                    </div>
                                 </div>
                             </div>
-                            <button 
-                                onClick={(e) => deleteHistory(item.id, e)}
-                                className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        ))
+                    ) : (
+                        history.map(item => (
+                            <div 
+                                key={item.id}
+                                onClick={() => viewHistoryItem(item)}
+                                className="bg-stone-800/50 hover:bg-stone-800 border border-stone-700 p-4 rounded-xl cursor-pointer transition-all flex items-center justify-between group animate-fade-in"
                             >
-                                <Trash2 size={16}/>
-                            </button>
-                        </div>
-                    ))}
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-stone-700 rounded-lg">
+                                        <FileText size={20} className="text-emerald-500"/>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-stone-200">{item.diagnosis}</p>
+                                        <p className="text-xs text-stone-500 flex items-center gap-1 mt-1">
+                                            <Calendar size={10}/>
+                                            {new Date(item.date).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={(e) => deleteHistory(item.id, e)}
+                                    className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={16}/>
+                                </button>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         )}
