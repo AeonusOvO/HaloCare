@@ -317,6 +317,22 @@ app.post('/api/chat/completions', async (req, res) => {
 });
 
 const port = process.env.PORT || 4000;
+
+// Global Error Handler to catch body-parser errors (like 413 Entity Too Large)
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    console.error(`[Server Error] Entity Too Large: ${err.message}`);
+    return res.status(413).json({ 
+      error: { 
+        message: 'Request entity too large (Server Limit Exceeded)', 
+        detail: 'Please restart the server if you just updated the limit.' 
+      } 
+    });
+  }
+  console.error('[Server Error]', err);
+  res.status(500).json({ error: { message: err.message || 'Internal Server Error' } });
+});
+
 app.listen(port, () => {
   console.log(`Backend server running on http://localhost:${port}`);
 });

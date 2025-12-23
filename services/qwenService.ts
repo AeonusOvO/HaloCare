@@ -41,7 +41,13 @@ export const callQwen = async (
         errorMessage = errorData.error?.message || errorData.message || errorMessage;
         console.error("Qwen API Error Data:", errorData);
       } catch (e) {
-        errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
+        // Try to read text response if JSON parse fails
+        try {
+           const errorText = await response.text();
+           errorMessage = `HTTP Error ${response.status} ${response.statusText} - Body: ${errorText.substring(0, 200)}`;
+        } catch (e2) {
+           errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
+        }
       }
       throw new Error(errorMessage);
     }
