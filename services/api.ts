@@ -149,5 +149,35 @@ export const api = {
     });
     if (!res.ok) throw await res.json();
     return res.json();
+  },
+
+  // Async Diagnosis Tasks
+  async startDiagnosisTask(token, inputData) {
+    const res = await fetch(`${API_BASE}/diagnosis/start`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(inputData)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getActiveTask(token) {
+    const res = await fetch(`${API_BASE}/diagnosis/active`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getTaskStatus(token, taskId) {
+    const res = await fetch(`${API_BASE}/diagnosis/task/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
   }
 };

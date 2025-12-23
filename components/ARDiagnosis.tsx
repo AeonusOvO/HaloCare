@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
-import { callQwen, analyzeImageWithQwenVL, analyzeAudioWithQwenOmni, generateFinalDiagnosis } from '../services/qwenService';
+import { analyzeImageWithQwenVL, analyzeAudioWithQwenOmni } from '../services/qwenService';
 import { api } from '../services/api';
 import { Message } from '../types';
+import { useDiagnosis, DiagnosisTask } from '../contexts/DiagnosisContext';
 
 // Steps of the TCM Diagnosis Flow
 enum DiagnosisStep {
@@ -130,9 +131,12 @@ const encodeWAV = (samples: Float32Array, sampleRate: number) => {
 };
 
 const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
+  // Use Global Diagnosis Context
+  const { activeTask, startDiagnosis, clearTask, minimized } = useDiagnosis();
+  
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v7-WavAudio");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v8-AsyncTasks");
   }, []);
 
   // ... (Camera & Stream State, Data State, Result State, History State remain unchanged)
@@ -192,6 +196,39 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const [isIntroShifted, setIsIntroShifted] = useState(false);
   // Track loaded state for each history item image to enable smooth fade-in
   const [historyImagesLoaded, setHistoryImagesLoaded] = useState<Record<string, boolean>>({});
+
+  // Sync Step with Active Task
+  useEffect(() => {
+    if (activeTask) {
+        // If task is processing, jump to Analysis/Report step
+        if (activeTask.status === 'processing') {
+            if (activeTask.step === 'report') {
+                setStep(DiagnosisStep.ANALYSIS); // Keep in analysis view until done? Or Report view?
+                // Actually Report view is better if we have intermediate progress
+                // But our UI structure puts streaming in ANALYSIS step UI.
+                setStep(DiagnosisStep.ANALYSIS);
+                setAnalysisProgress(activeTask.progress);
+            } else {
+                setStep(DiagnosisStep.ANALYSIS);
+                setAnalysisProgress(activeTask.progress);
+            }
+        } else if (activeTask.status === 'completed') {
+            // Task done, show result
+            if (activeTask.result) {
+                setReport({ 
+                    content: activeTask.result.fullReport?.content || '', 
+                    reasoning: activeTask.result.fullReport?.reasoning || '', 
+                    parsed: activeTask.result.fullReport 
+                });
+                setImages(activeTask.result.images || { face: null, tongue: null });
+                setStep(DiagnosisStep.REPORT);
+            }
+        } else if (activeTask.status === 'failed') {
+            setError(activeTask.error || '任务失败');
+            setStep(DiagnosisStep.ANALYSIS);
+        }
+    }
+  }, [activeTask]);
 
   // Transition Helper Logic
   const getSlidePosition = (targetStep: DiagnosisStep) => {
@@ -629,41 +666,21 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     isRunningAnalysis.current = true;
     
     try {
-      let finalContent = '';
-      let finalReasoning = '';
-      
-      const res = await generateFinalDiagnosis(
-        wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
-        wenResult || "（系统提示：闻诊分析尚未生成）",
-        wenAudioText,
-        inquiryData,
-        qieData,
-        (content, reasoning) => {
-          finalContent = content;
-          finalReasoning = reasoning;
-          setRealtimeContent(content);
-          setRealtimeReasoning(reasoning);
-        },
-        () => setIsConnected(true)
-      );
-      
-      // Double check in case stream loop returned early
-      finalContent = res.content || finalContent;
-      finalReasoning = res.reasoning || finalReasoning;
+      // Collect all data
+      const inputData = {
+          wangResult: wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
+          wenResult: wenResult || "（系统提示：闻诊分析尚未生成）",
+          wenAudioText,
+          inquiryData,
+          qieData,
+          images // Pass images to persist them in the result later
+      };
 
-      let parsedData: DiagnosisReport | undefined;
-      try {
-          const cleanJson = finalContent.replace(/```json/g, '').replace(/```/g, '').trim();
-          parsedData = JSON.parse(cleanJson);
-      } catch (e) {
-          console.warn("Failed to parse JSON response, falling back to raw text", e);
-      }
-
-      setReport({ content: finalContent, reasoning: finalReasoning, parsed: parsedData });
-      if (parsedData) {
-          saveToHistory(parsedData);
-      }
-      changeStep(DiagnosisStep.REPORT);
+      // Start Async Task via Context
+      await startDiagnosis(inputData);
+      
+      // We don't need to do anything else here, the useEffect([activeTask]) will handle the UI updates
+      
     } catch (error: any) {
       console.error(error);
       setError(error.message || '请求失败，请检查网络连接');
@@ -698,20 +715,31 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 系统将引导您完成中医四诊流程。<br/>
                 利用大模型视觉能力分析面色与舌象，结合问诊信息，为您生成精准的健康报告。
             </p>
-            <button 
-                onClick={() => {
-                    // Reset all data for new diagnosis
-                    setImages({ face: null, tongue: null });
-                    setWenAudioText('');
-                    setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
-                    setQieData('');
-                    setStream(null); // Ensure stream is reset
-                    changeStep(DiagnosisStep.WANG);
-                }}
-                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
-            >
-                开始新诊断 <ChevronRight />
-            </button>
+            {activeTask && ['pending', 'processing'].includes(activeTask.status) ? (
+                 <button 
+                    disabled
+                    className="px-8 py-4 bg-stone-700 text-stone-400 rounded-full font-bold text-lg cursor-not-allowed flex items-center gap-2"
+                >
+                    <Loader2 className="animate-spin"/> 正在辩证中...
+                </button>
+            ) : (
+                <button 
+                    onClick={() => {
+                        // Reset all data for new diagnosis
+                        setImages({ face: null, tongue: null });
+                        setWenAudioText('');
+                        setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
+                        setQieData('');
+                        setStream(null); // Ensure stream is reset
+                        // Clear any old task state
+                        clearTask();
+                        changeStep(DiagnosisStep.WANG);
+                    }}
+                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
+                >
+                    开始新诊断 <ChevronRight />
+                </button>
+            )}
         </div>
 
         {/* History Section */}

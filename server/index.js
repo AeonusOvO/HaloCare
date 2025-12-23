@@ -7,6 +7,7 @@ import multer from 'multer';
 import fs from 'fs-extra';
 import jwt from 'jsonwebtoken';
 import { db } from './db.js';
+import { taskManager } from './taskManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -148,6 +149,41 @@ app.post('/api/family/role', authenticateToken, async (req, res) => {
     res.json(family);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// --- Diagnosis Task Routes (Async) ---
+
+app.post('/api/diagnosis/start', authenticateToken, (req, res) => {
+  try {
+    const inputData = req.body; // Should contain images, text, etc.
+    const task = taskManager.startTask(req.user.id, inputData);
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/diagnosis/active', authenticateToken, (req, res) => {
+  try {
+    const task = taskManager.getUserActiveTask(req.user.id);
+    res.json(task || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/diagnosis/task/:taskId', authenticateToken, (req, res) => {
+  try {
+    const task = taskManager.getTask(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    
+    // Security check: only allow owner to see task
+    if (task.userId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -8,8 +8,10 @@ import SmartConsultation from './components/SmartConsultation';
 import ARDiagnosis from './components/ARDiagnosis';
 import AIButler from './components/AIButler';
 import Auth from './components/Auth';
+import FloatingCapsule from './components/FloatingCapsule';
 import { api } from './services/api';
 import { AppView, UserProfile } from './types';
+import { useDiagnosis } from './contexts/DiagnosisContext';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
@@ -17,6 +19,16 @@ const App: React.FC = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // We can use the context here if needed, e.g. to minimize task when changing view
+  const { setMinimized, activeTask } = useDiagnosis();
+
+  // Automatically minimize active task if user navigates away from Diagnosis view
+  useEffect(() => {
+    if (activeTask && currentView !== AppView.AI_DIAGNOSIS) {
+        setMinimized(true);
+    }
+  }, [currentView, activeTask]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -88,6 +100,7 @@ const App: React.FC = () => {
   return (
     <Layout currentView={currentView} onChangeView={setCurrentView}>
       {renderContent()}
+      <FloatingCapsule onChangeView={setCurrentView} />
     </Layout>
   );
 };

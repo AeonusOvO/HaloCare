@@ -171,6 +171,40 @@ git push
 
 ---
 
+## 7. 数据存储结构 (Data Storage)
+> 本项目使用基于文件系统的 NoSQL 存储方案，所有数据均位于 `/var/www/HaloCare/storage` 目录。
+
+### 7.1 目录结构
+```text
+storage/
+├── families/                  # 家庭组数据
+│   └── [familyId].json        # 包含成员列表、创建者等信息
+├── users/                     # 用户个人数据
+│   └── [userId]/
+│       ├── profile.json       # 用户基础信息 (账号、加密密码、家庭关联)
+│       ├── notifications.json # 消息通知 (如家庭邀请)
+│       ├── photos/            # 用户上传的原始图片 (预留)
+│       ├── diagnosis_index.json    # [新增] 诊断历史索引 (仅包含 ID、日期、简述，无大图)
+│       └── diagnosis_records/      # [新增] 诊断记录详情目录
+│           └── [recordId].json     # 完整诊断记录 (含 Base64 图片、详细报告)
+└── user_index.json            # 用户名 -> UserID 的全局映射表
+```
+
+### 7.2 核心逻辑变更 (v1.1)
+为了解决大量图片导致的加载卡顿问题，我们将 AI 诊断记录拆分为**索引**与**详情**两部分：
+1.  **索引 (Index)**: `diagnosis_index.json` 仅存储轻量级元数据。前端加载列表时只读取此文件，实现**秒开**。
+2.  **详情 (Detail)**: `diagnosis_records/[id].json` 存储完整数据。只有当用户点击某条记录时，才会按需加载该文件。
+3.  **兼容性**: 旧版本的 `diagnosis_history.json` 单文件存储方式已废弃。
+
+### 7.3 数据备份建议
+由于数据分散在多个小文件中，建议使用 `tar` 打包备份：
+```bash
+# 备份所有用户数据
+tar -czvf backup_storage_$(date +%Y%m%d).tar.gz /var/www/HaloCare/storage
+```
+
+---
+
 ## 8. 移动端 App 维护 (Android App Maintenance)
 
 本项目使用 **Capacitor** 将 Web 应用打包为 Android App。以下操作均在 **本地 Windows 开发环境** 进行，无需在服务器上执行。
