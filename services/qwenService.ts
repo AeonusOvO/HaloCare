@@ -1,5 +1,8 @@
 import { Message } from '../types';
-const BASE_URL = '/api/chat/completions';
+
+// DEBUG: Bypass Vite Proxy to rule out proxy limits
+// Was: const BASE_URL = '/api/chat/completions';
+const BASE_URL = 'http://localhost:4000/api/chat/completions';
 
 export const callQwen = async (
   messages: Message[],

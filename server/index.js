@@ -15,9 +15,15 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '200mb' })); // Increased limit for photos and audio
-app.use(express.urlencoded({ limit: '200mb', extended: true }));
+app.use(cors()); // Allow all origins
+
+// Explicitly log the limit setting to confirm server restart
+console.log("Configuring Express: Body Limit = 200mb");
+
+// Use a raw byte value just in case 'mb' parsing is quirky in some envs
+const LIMIT = 200 * 1024 * 1024; // 200MB
+app.use(express.json({ limit: LIMIT })); 
+app.use(express.urlencoded({ limit: LIMIT, extended: true }));
 
 // Debug middleware to check content length
 app.use((req, res, next) => {
