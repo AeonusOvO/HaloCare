@@ -61,6 +61,11 @@ const resizeImage = (dataUrl: string, maxWidth: number = 800): Promise<string> =
 };
 
 const ARDiagnosis: React.FC = () => {
+  // Debug log to verify version
+  useEffect(() => {
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v2-HistorySync");
+  }, []);
+
   // Camera & Stream State
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

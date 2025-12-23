@@ -16,6 +16,10 @@ const init = async () => {
   await fs.ensureDir(STORAGE_DIR);
   await fs.ensureDir(USERS_DIR);
   await fs.ensureDir(FAMILIES_DIR);
+  
+  console.log(`[DB] Storage directory initialized at: ${STORAGE_DIR}`);
+  console.log(`[DB] Users directory: ${USERS_DIR}`);
+
   if (!await fs.pathExists(USER_INDEX_FILE)) {
     await fs.writeJson(USER_INDEX_FILE, {});
   }
