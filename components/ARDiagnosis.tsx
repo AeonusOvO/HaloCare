@@ -170,18 +170,24 @@ const ARDiagnosis: React.FC = () => {
   // --- Camera Logic ---
   useEffect(() => {
     let activeStream: MediaStream | null = null;
+    let isCancelled = false;
+
     const startCamera = async () => {
       // 1. Check for Secure Context (HTTPS)
       if (!window.isSecureContext) {
-        setPermissionError(true);
-        setCameraErrorMsg('摄像头需要HTTPS安全连接，当前环境不安全。');
+        if (!isCancelled) {
+            setPermissionError(true);
+            setCameraErrorMsg('摄像头需要HTTPS安全连接，当前环境不安全。');
+        }
         return;
       }
 
       // 2. Check Browser Support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setPermissionError(true);
-        setCameraErrorMsg('您的浏览器不支持摄像头调用。');
+        if (!isCancelled) {
+            setPermissionError(true);
+            setCameraErrorMsg('您的浏览器不支持摄像头调用。');
+        }
         return;
       }
 
@@ -190,11 +196,18 @@ const ARDiagnosis: React.FC = () => {
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false 
         });
+        
+        if (isCancelled) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            return;
+        }
+
         activeStream = mediaStream;
         setStream(mediaStream);
         setPermissionError(false);
         setCameraErrorMsg('');
       } catch (err: any) {
+        if (isCancelled) return;
         console.error("Camera error:", err);
         setPermissionError(true);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -206,9 +219,16 @@ const ARDiagnosis: React.FC = () => {
         }
       }
     };
+    
     if (step === DiagnosisStep.WANG && !stream) startCamera();
+    
     return () => {
-      if (activeStream) activeStream.getTracks().forEach(track => track.stop());
+      isCancelled = true;
+      if (activeStream) {
+          activeStream.getTracks().forEach(track => track.stop());
+      }
+      // Clear stream state when leaving the step or unmounting
+      setStream(null);
     };
   }, [step]);
 
@@ -430,6 +450,7 @@ const ARDiagnosis: React.FC = () => {
                     setWenAudioText('');
                     setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
                     setQieData('');
+                    setStream(null); // Ensure stream is reset
                     setStep(DiagnosisStep.WANG);
                 }}
                 className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
