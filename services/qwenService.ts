@@ -1,8 +1,6 @@
 import { Message } from '../types';
 
-// DEBUG: Bypass Vite Proxy to rule out proxy limits
-// Was: const BASE_URL = '/api/chat/completions';
-const BASE_URL = 'http://localhost:4000/api/chat/completions';
+const BASE_URL = '/api/chat/completions';
 
 export const callQwen = async (
   messages: Message[],
@@ -51,6 +49,10 @@ export const callQwen = async (
         } catch (e2) {
            errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
         }
+      }
+      // If we got an upstream 413, clarify it for the user
+      if (errorMessage.includes('Upstream') && errorMessage.includes('413')) {
+          errorMessage = '音频文件过大，超出云端服务限制。请尝试录制更短的音频（建议10秒以内）。';
       }
       throw new Error(errorMessage);
     }
