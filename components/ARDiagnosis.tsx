@@ -60,10 +60,10 @@ const resizeImage = (dataUrl: string, maxWidth: number = 800): Promise<string> =
   });
 };
 
-const ARDiagnosis: React.FC = () => {
+const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v2-HistorySync");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v3-IntroAnimation");
   }, []);
 
   // Camera & Stream State
@@ -104,6 +104,7 @@ const ARDiagnosis: React.FC = () => {
   // History State
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isIntroShifted, setIsIntroShifted] = useState(false);
 
   // Load history on mount or when returning to intro
   useEffect(() => {
@@ -124,6 +125,32 @@ const ARDiagnosis: React.FC = () => {
         loadHistory();
     }
   }, [step]);
+
+  // Handle Intro Animation based on History
+  useEffect(() => {
+      if (!userId) return;
+      const storageKey = `ar_intro_animated_${userId}`;
+      const hasAnimated = localStorage.getItem(storageKey);
+
+      if (history.length > 0) {
+          if (hasAnimated) {
+              // Already animated, shift immediately
+              setIsIntroShifted(true);
+          } else {
+              // Not animated yet, start centered then animate up
+              setIsIntroShifted(false);
+              // Delay slightly to ensure render, then animate
+              const timer = setTimeout(() => {
+                  setIsIntroShifted(true);
+                  localStorage.setItem(storageKey, 'true');
+              }, 800);
+              return () => clearTimeout(timer);
+          }
+      } else {
+          // No history, stay centered
+          setIsIntroShifted(false);
+      }
+  }, [history.length, userId]);
 
   // Save to history helper
   const saveToHistory = async (parsedReport: DiagnosisReport) => {
@@ -438,7 +465,7 @@ const ARDiagnosis: React.FC = () => {
   const renderIntro = () => (
     <div className="flex-1 flex flex-col bg-stone-900 text-white overflow-hidden">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <div className={`flex flex-col items-center transition-all duration-1000 ease-in-out ${isIntroShifted ? 'justify-start pt-10 min-h-[30vh]' : 'justify-center min-h-[80vh]'}`}>
             <div className="mb-6 p-6 bg-emerald-900/30 rounded-full border border-emerald-500/30">
                 <ScanEye size={64} className="text-emerald-400" />
             </div>
@@ -465,7 +492,7 @@ const ARDiagnosis: React.FC = () => {
 
         {/* History Section */}
         {(history.length > 0 || isLoadingHistory) && (
-            <div className="max-w-md mx-auto mt-12 border-t border-stone-800 pt-8">
+            <div className={`max-w-md mx-auto mt-12 border-t border-stone-800 pt-8 transition-all duration-1000 ease-out delay-500 ${isIntroShifted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
                 <h3 className="text-lg font-bold text-stone-400 mb-4 flex items-center gap-2">
                     <Clock size={18}/> 历史记录
                 </h3>

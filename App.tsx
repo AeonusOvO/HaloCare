@@ -42,6 +42,9 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (user && user.id) {
+        localStorage.removeItem(`ar_intro_animated_${user.id}`);
+    }
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
@@ -60,7 +63,7 @@ const App: React.FC = () => {
       case AppView.LEARNING:
         return <Learning />;
       case AppView.AI_DIAGNOSIS:
-        return <ARDiagnosis />;
+        return <ARDiagnosis userId={user?.id} />;
       case AppView.COMMUNITY:
         return <Community onChangeView={setCurrentView} />;
       case AppView.PROFILE:
