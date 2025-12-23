@@ -190,6 +190,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isIntroShifted, setIsIntroShifted] = useState(false);
+  // Track loaded state for each history item image to enable smooth fade-in
+  const [historyImagesLoaded, setHistoryImagesLoaded] = useState<Record<string, boolean>>({});
 
   // Transition Helper Logic
   const getSlidePosition = (targetStep: DiagnosisStep) => {
@@ -213,6 +215,19 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         setIsLoadingHistory(true);
         try {
             const data = await api.getDiagnosisHistory(token);
+            // Preload images in background without blocking UI
+            data.forEach((item: HistoryItem) => {
+               if (item.images?.face) {
+                   const img = new Image();
+                   img.src = item.images.face;
+                   img.onload = () => setHistoryImagesLoaded(prev => ({...prev, [`${item.id}-face`]: true}));
+               }
+               if (item.images?.tongue) {
+                   const img = new Image();
+                   img.src = item.images.tongue;
+                   img.onload = () => setHistoryImagesLoaded(prev => ({...prev, [`${item.id}-tongue`]: true}));
+               }
+            });
             setHistory(data);
         } catch (e) {
             console.error("Failed to load history", e);
@@ -292,6 +307,13 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   };
 
   const viewHistoryItem = (item: HistoryItem) => {
+    // Only allow viewing if clicking, but we disable interaction via UI
+    // The user requirement is: "If this account has history records, display a loading animation (colored blocks), unclickable."
+    // However, the requirement also says: "Resource background download, waiting for resources to download, use a simple animation to show details."
+    // This likely means the *Intro* view history list itself should load gracefully.
+    // If the user meant clicking into details, the logic is fine. 
+    // Assuming the requirement is about the *list items* themselves loading their content (images/text) smoothly.
+    
     setReport({ content: '', reasoning: '', parsed: item.fullReport });
     setImages(item.images);
     changeStep(DiagnosisStep.REPORT);
@@ -704,15 +726,41 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                             </div>
                         ))
                     ) : (
-                        history.map(item => (
+                        history.map(item => {
+                            // Check if images are fully loaded for this item
+                            // We define "ready" as: text data is always instant (JSON), images are loaded if they exist.
+                            // If an item has no images, it's ready immediately.
+                            const hasFace = !!item.images?.face;
+                            const isFaceLoaded = !hasFace || historyImagesLoaded[`${item.id}-face`];
+                            const isReady = isFaceLoaded; 
+
+                            return (
                             <div 
                                 key={item.id}
-                                onClick={() => viewHistoryItem(item)}
-                                className="bg-stone-800/50 hover:bg-stone-800 border border-stone-700 p-4 rounded-xl cursor-pointer transition-all flex items-center justify-between group animate-fade-in"
+                                onClick={() => isReady && viewHistoryItem(item)}
+                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden
+                                    ${isReady 
+                                        ? 'bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in' 
+                                        : 'bg-stone-800/30 border-stone-800 cursor-wait pointer-events-none'
+                                    }`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2 bg-stone-700 rounded-lg">
-                                        <FileText size={20} className="text-emerald-500"/>
+                                {/* Loading Overlay (Color Blocks Animation) */}
+                                {!isReady && (
+                                    <div className="absolute inset-0 z-10 bg-stone-900 flex items-center justify-center gap-1">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-0"></div>
+                                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce delay-100"></div>
+                                        <div className="w-2 h-2 bg-emerald-700 rounded-full animate-bounce delay-200"></div>
+                                    </div>
+                                )}
+
+                                <div className={`flex items-center gap-4 transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
+                                    <div className="p-2 bg-stone-700 rounded-lg relative overflow-hidden">
+                                        {/* Show thumbnail if available */}
+                                        {item.images?.face ? (
+                                            <img src={item.images.face} className="w-5 h-5 object-cover rounded opacity-80" />
+                                        ) : (
+                                            <FileText size={20} className="text-emerald-500"/>
+                                        )}
                                     </div>
                                     <div>
                                         <p className="font-bold text-stone-200">{item.diagnosis}</p>
@@ -722,14 +770,17 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                                         </p>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={(e) => deleteHistory(item.id, e)}
-                                    className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 size={16}/>
-                                </button>
+                                
+                                {isReady && (
+                                    <button 
+                                        onClick={(e) => deleteHistory(item.id, e)}
+                                        className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <Trash2 size={16}/>
+                                    </button>
+                                )}
                             </div>
-                        ))
+                        )})
                     )}
                 </div>
             </div>
