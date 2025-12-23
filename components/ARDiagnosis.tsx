@@ -60,12 +60,34 @@ const resizeImage = (dataUrl: string, maxWidth: number = 800): Promise<string> =
   });
 };
 
+// Helper for slide transition
+const SlideTransition: React.FC<{
+  children: React.ReactNode;
+  direction: 'left' | 'right';
+  isActive: boolean;
+}> = ({ children, direction, isActive }) => {
+  return (
+    <div
+      className={`absolute inset-0 transition-transform duration-500 ease-in-out transform ${
+        isActive
+          ? 'translate-x-0'
+          : direction === 'right'
+          ? 'translate-x-full'
+          : '-translate-x-full'
+      }`}
+    >
+      {children}
+    </div>
+  );
+};
+
 const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v3-IntroAnimation");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v4-PageTransition");
   }, []);
 
+  // ... (Camera & Stream State, Data State, Result State, History State remain unchanged)
   // Camera & Stream State
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,6 +98,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
   // Diagnosis Flow State
   const [step, setStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
+  const [prevStep, setPrevStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [wangType, setWangType] = useState<WangType>('face');
   
   // Data State
@@ -106,6 +130,21 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isIntroShifted, setIsIntroShifted] = useState(false);
 
+  // Update direction when step changes
+  useEffect(() => {
+    if (step > prevStep) {
+      setDirection('forward');
+    } else if (step < prevStep) {
+      setDirection('backward');
+    }
+    setPrevStep(step);
+  }, [step]);
+
+  const changeStep = (newStep: DiagnosisStep) => {
+      setStep(newStep);
+  };
+  
+  // ... (Load history, Intro Animation, Save to history helper, deleteHistory, viewHistoryItem remain unchanged)
   // Load history on mount or when returning to intro
   useEffect(() => {
     const loadHistory = async () => {
@@ -195,9 +234,10 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const viewHistoryItem = (item: HistoryItem) => {
     setReport({ content: '', reasoning: '', parsed: item.fullReport });
     setImages(item.images);
-    setStep(DiagnosisStep.REPORT);
+    changeStep(DiagnosisStep.REPORT);
   };
 
+  // ... (Camera Logic, Voice Input Logic, Analysis Logic remain largely unchanged, but using changeStep instead of setStep)
   // --- Camera Logic ---
   useEffect(() => {
     let activeStream: MediaStream | null = null;
@@ -357,7 +397,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
   // --- Analysis Logic ---
   const startAnalysis = async () => {
-    setStep(DiagnosisStep.ANALYSIS);
+    changeStep(DiagnosisStep.ANALYSIS);
     setRealtimeReasoning('');
     setRealtimeContent('');
     setIsConnected(false);
@@ -439,7 +479,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       if (parsedData) {
           saveToHistory(parsedData);
       }
-      setStep(DiagnosisStep.REPORT);
+      changeStep(DiagnosisStep.REPORT);
     } catch (error: any) {
       console.error(error);
       // Instead of resetting to QIE immediately, we show the error state
@@ -450,20 +490,20 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // --- Navigation Helper ---
   const goBack = () => {
     switch (step) {
-      case DiagnosisStep.WANG: setStep(DiagnosisStep.INTRO); break;
-      case DiagnosisStep.WEN_AUDIO: setStep(DiagnosisStep.WANG); break;
-      case DiagnosisStep.WEN_INQUIRY: setStep(DiagnosisStep.WEN_AUDIO); break;
-      case DiagnosisStep.QIE: setStep(DiagnosisStep.WEN_INQUIRY); break;
-      case DiagnosisStep.ANALYSIS: setStep(DiagnosisStep.QIE); break;
-      case DiagnosisStep.REPORT: setStep(DiagnosisStep.INTRO); break;
-      default: setStep(DiagnosisStep.INTRO);
+      case DiagnosisStep.WANG: changeStep(DiagnosisStep.INTRO); break;
+      case DiagnosisStep.WEN_AUDIO: changeStep(DiagnosisStep.WANG); break;
+      case DiagnosisStep.WEN_INQUIRY: changeStep(DiagnosisStep.WEN_AUDIO); break;
+      case DiagnosisStep.QIE: changeStep(DiagnosisStep.WEN_INQUIRY); break;
+      case DiagnosisStep.ANALYSIS: changeStep(DiagnosisStep.QIE); break;
+      case DiagnosisStep.REPORT: changeStep(DiagnosisStep.INTRO); break;
+      default: changeStep(DiagnosisStep.INTRO);
     }
   };
 
   // --- Renders ---
 
   const renderIntro = () => (
-    <div className="flex-1 flex flex-col bg-stone-900 text-white overflow-hidden">
+    <div className="flex-1 flex flex-col bg-stone-900 text-white overflow-hidden h-full">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
         <div className={`flex flex-col items-center transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isIntroShifted ? 'mt-10 mb-0' : 'mt-[25vh] mb-[25vh]'}`}>
             <div className="mb-6 p-6 bg-emerald-900/30 rounded-full border border-emerald-500/30">
@@ -482,7 +522,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
                     setQieData('');
                     setStream(null); // Ensure stream is reset
-                    setStep(DiagnosisStep.WANG);
+                    changeStep(DiagnosisStep.WANG);
                 }}
                 className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
             >
@@ -546,7 +586,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderWang = () => (
-    <div className="flex-1 flex flex-col bg-black relative">
+    <div className="flex-1 flex flex-col bg-black relative h-full">
       {/* Header with Back Button */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
         <button onClick={goBack} className="text-white p-2 bg-black/20 rounded-full backdrop-blur hover:bg-black/40">
@@ -677,7 +717,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                   setWangType('tongue');
                   return;
               }
-              setStep(DiagnosisStep.WEN_AUDIO);
+              changeStep(DiagnosisStep.WEN_AUDIO);
           }}
           className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
         >
@@ -689,7 +729,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderWenAudio = () => (
-    <div className="flex-1 flex flex-col bg-stone-50 text-stone-800 p-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-stone-50 text-stone-800 p-6 overflow-y-auto h-full">
       <div className="max-w-2xl mx-auto w-full">
         <div className="flex items-center justify-between mb-2">
             <button onClick={goBack} className="text-stone-500 hover:text-stone-800 p-1">
@@ -732,7 +772,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             上一步
           </button>
           <button 
-            onClick={() => setStep(DiagnosisStep.WEN_INQUIRY)}
+            onClick={() => changeStep(DiagnosisStep.WEN_INQUIRY)}
             className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all flex items-center gap-2"
           >
             下一步 <ChevronRight size={18} />
@@ -743,7 +783,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderWenInquiry = () => (
-    <div className="flex-1 flex flex-col bg-stone-50 text-stone-800 p-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-stone-50 text-stone-800 p-6 overflow-y-auto h-full">
       <div className="max-w-2xl mx-auto w-full">
         <div className="flex items-center justify-between mb-2">
             <button onClick={goBack} className="text-stone-500 hover:text-stone-800 p-1">
@@ -789,7 +829,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             上一步
           </button>
           <button 
-            onClick={() => setStep(DiagnosisStep.QIE)}
+            onClick={() => changeStep(DiagnosisStep.QIE)}
             className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all flex items-center gap-2"
           >
             下一步 <ChevronRight size={18} />
@@ -800,7 +840,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderQie = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-stone-900 text-white text-center">
+    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-stone-900 text-white text-center h-full">
       <div className="w-full max-w-2xl flex items-center justify-between mb-8">
         <button onClick={goBack} className="text-stone-400 hover:text-white p-2 bg-stone-800 rounded-full">
             <ChevronLeft size={20}/>
@@ -841,17 +881,17 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderReport = () => (
-    <div className="flex-1 flex flex-col overflow-hidden bg-stone-950 text-white">
+    <div className="flex-1 flex flex-col overflow-hidden bg-stone-950 text-white h-full">
       <div className="bg-stone-900 p-4 flex items-center justify-between shadow-md z-10 border-b border-stone-800">
         <div className="flex items-center gap-3">
-            <button onClick={() => setStep(DiagnosisStep.INTRO)} className="p-1 hover:bg-stone-800 rounded-full">
+            <button onClick={() => changeStep(DiagnosisStep.INTRO)} className="p-1 hover:bg-stone-800 rounded-full">
                 <ChevronLeft size={20} className="text-stone-400"/>
             </button>
             <h2 className="text-xl font-serif font-bold text-emerald-400 flex items-center gap-2">
             <FileText /> 诊断报告
             </h2>
         </div>
-        <button onClick={() => setStep(DiagnosisStep.INTRO)} className="text-sm text-stone-400 hover:text-white flex items-center gap-1 transition-colors">
+        <button onClick={() => changeStep(DiagnosisStep.INTRO)} className="text-sm text-stone-400 hover:text-white flex items-center gap-1 transition-colors">
            <RefreshCw size={14}/> 返回首页
         </button>
       </div>
@@ -868,7 +908,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                    <p className="text-stone-300 text-center mb-6">{error}</p>
                    <div className="flex gap-4">
                      <button 
-                        onClick={() => setStep(DiagnosisStep.QIE)}
+                        onClick={() => changeStep(DiagnosisStep.QIE)}
                         className="px-6 py-2 bg-stone-800 hover:bg-stone-700 rounded-full text-white transition-colors"
                      >
                        返回上一步
@@ -1041,16 +1081,28 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     </div>
   );
 
-  switch (step) {
-    case DiagnosisStep.INTRO: return renderIntro();
-    case DiagnosisStep.WANG: return renderWang();
-    case DiagnosisStep.WEN_AUDIO: return renderWenAudio();
-    case DiagnosisStep.WEN_INQUIRY: return renderWenInquiry();
-    case DiagnosisStep.QIE: return renderQie();
-    case DiagnosisStep.ANALYSIS:
-    case DiagnosisStep.REPORT: return renderReport();
-    default: return renderIntro();
-  }
+  return (
+    <div className="flex-1 relative overflow-hidden bg-stone-950 h-full">
+      <SlideTransition isActive={step === DiagnosisStep.INTRO} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderIntro()}
+      </SlideTransition>
+      <SlideTransition isActive={step === DiagnosisStep.WANG} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderWang()}
+      </SlideTransition>
+      <SlideTransition isActive={step === DiagnosisStep.WEN_AUDIO} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderWenAudio()}
+      </SlideTransition>
+      <SlideTransition isActive={step === DiagnosisStep.WEN_INQUIRY} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderWenInquiry()}
+      </SlideTransition>
+      <SlideTransition isActive={step === DiagnosisStep.QIE} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderQie()}
+      </SlideTransition>
+      <SlideTransition isActive={step === DiagnosisStep.ANALYSIS || step === DiagnosisStep.REPORT} direction={direction === 'forward' ? 'right' : 'left'}>
+        {renderReport()}
+      </SlideTransition>
+    </div>
+  );
 };
 
 export default ARDiagnosis;
