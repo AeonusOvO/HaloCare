@@ -63,18 +63,15 @@ const resizeImage = (dataUrl: string, maxWidth: number = 800): Promise<string> =
 // Helper for slide transition
 const SlideTransition: React.FC<{
   children: React.ReactNode;
-  direction: 'left' | 'right';
-  isActive: boolean;
-}> = ({ children, direction, isActive }) => {
+  position: 'left' | 'right' | 'center';
+}> = ({ children, position }) => {
+  let translateClass = 'translate-x-0';
+  if (position === 'left') translateClass = '-translate-x-full';
+  if (position === 'right') translateClass = 'translate-x-full';
+
   return (
     <div
-      className={`absolute inset-0 transition-transform duration-500 ease-in-out transform ${
-        isActive
-          ? 'translate-x-0'
-          : direction === 'right'
-          ? 'translate-x-full'
-          : '-translate-x-full'
-      }`}
+      className={`absolute inset-0 transition-transform duration-500 ease-in-out transform ${translateClass}`}
     >
       {children}
     </div>
@@ -84,7 +81,7 @@ const SlideTransition: React.FC<{
 const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v4-PageTransition");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v5-SmartTransition");
   }, []);
 
   // ... (Camera & Stream State, Data State, Result State, History State remain unchanged)
@@ -98,8 +95,6 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
   // Diagnosis Flow State
   const [step, setStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
-  const [prevStep, setPrevStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
-  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [wangType, setWangType] = useState<WangType>('face');
   
   // Data State
@@ -130,22 +125,21 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isIntroShifted, setIsIntroShifted] = useState(false);
 
-  // Update direction when step changes
-  useEffect(() => {
-    if (step > prevStep) {
-      setDirection('forward');
-    } else if (step < prevStep) {
-      setDirection('backward');
-    }
-    setPrevStep(step);
-  }, [step]);
+  // Transition Helper Logic
+  const getSlidePosition = (targetStep: DiagnosisStep) => {
+      // Group Analysis and Report as effectively the same step for transition purposes
+      const normalize = (s: DiagnosisStep) => (s === DiagnosisStep.REPORT ? DiagnosisStep.ANALYSIS : s);
+      
+      const normTarget = normalize(targetStep);
+      const normCurrent = normalize(step);
 
+      if (normTarget === normCurrent) return 'center';
+      return normTarget < normCurrent ? 'left' : 'right';
+  };
+  
   const changeStep = (newStep: DiagnosisStep) => {
       setStep(newStep);
   };
-  
-  // ... (Load history, Intro Animation, Save to history helper, deleteHistory, viewHistoryItem remain unchanged)
-  // Load history on mount or when returning to intro
   useEffect(() => {
     const loadHistory = async () => {
         const token = localStorage.getItem('token');
@@ -1083,22 +1077,23 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
   return (
     <div className="flex-1 relative overflow-hidden bg-stone-950 h-full">
-      <SlideTransition isActive={step === DiagnosisStep.INTRO} direction={direction === 'forward' ? 'right' : 'left'}>
+      <SlideTransition position={getSlidePosition(DiagnosisStep.INTRO)}>
         {renderIntro()}
       </SlideTransition>
-      <SlideTransition isActive={step === DiagnosisStep.WANG} direction={direction === 'forward' ? 'right' : 'left'}>
+      <SlideTransition position={getSlidePosition(DiagnosisStep.WANG)}>
         {renderWang()}
       </SlideTransition>
-      <SlideTransition isActive={step === DiagnosisStep.WEN_AUDIO} direction={direction === 'forward' ? 'right' : 'left'}>
+      <SlideTransition position={getSlidePosition(DiagnosisStep.WEN_AUDIO)}>
         {renderWenAudio()}
       </SlideTransition>
-      <SlideTransition isActive={step === DiagnosisStep.WEN_INQUIRY} direction={direction === 'forward' ? 'right' : 'left'}>
+      <SlideTransition position={getSlidePosition(DiagnosisStep.WEN_INQUIRY)}>
         {renderWenInquiry()}
       </SlideTransition>
-      <SlideTransition isActive={step === DiagnosisStep.QIE} direction={direction === 'forward' ? 'right' : 'left'}>
+      <SlideTransition position={getSlidePosition(DiagnosisStep.QIE)}>
         {renderQie()}
       </SlideTransition>
-      <SlideTransition isActive={step === DiagnosisStep.ANALYSIS || step === DiagnosisStep.REPORT} direction={direction === 'forward' ? 'right' : 'left'}>
+      {/* Group Analysis and Report together */}
+      <SlideTransition position={getSlidePosition(DiagnosisStep.ANALYSIS)}>
         {renderReport()}
       </SlideTransition>
     </div>
