@@ -16,7 +16,17 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased limit for photos
+app.use(express.json({ limit: '200mb' })); // Increased limit for photos and audio
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
+
+// Debug middleware to check content length
+app.use((req, res, next) => {
+  if (req.path === '/api/chat/completions') {
+    console.log(`[Middleware] Incoming request to ${req.path}, Content-Length: ${req.get('Content-Length')}`);
+  }
+  next();
+});
+
 app.use('/uploads', express.static(path.join(__dirname, '../storage/uploads')));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
@@ -247,15 +257,24 @@ app.post('/api/chat/completions', async (req, res) => {
 
     if (!response.ok) {
       let errorMessage = 'Upstream API request failed';
+      let errorBody = {};
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        console.error('[Upstream Error]', errorData);
+        errorBody = await response.json();
+        errorMessage = errorBody.error?.message || errorBody.message || errorMessage;
+        console.error('[Upstream Error Body]', JSON.stringify(errorBody));
       } catch (_) {
         errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
         console.error('[Upstream Error]', response.status, response.statusText);
       }
-      res.status(response.status).json({ error: { message: errorMessage } });
+      
+      // Pass through the status code and error details
+      console.error(`[Upstream Error] Status: ${response.status}, Message: ${errorMessage}`);
+      res.status(response.status).json({ 
+        error: { 
+          message: `Upstream(${response.status}): ${errorMessage}`,
+          details: errorBody 
+        } 
+      });
       return;
     }
 
