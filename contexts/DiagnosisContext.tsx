@@ -44,6 +44,12 @@ export const DiagnosisProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           // If task is running, start polling
           if (['pending', 'processing'].includes(task.status)) {
             startPolling(task.id);
+            // If we are recovering a running task, and we are NOT in the diagnosis view (which we can't know here easily without router), 
+            // we should default to minimized so the capsule shows up.
+            // But since this context is global, we can rely on App.tsx to set minimized based on View.
+            // However, initially, we should probably set minimized=true to be safe, 
+            // and let the Diagnosis component unset it if it mounts.
+            setMinimized(true); 
           } else if (task.status === 'completed' || task.status === 'failed') {
             // Task finished while user was away
             setMinimized(true); // Show as notification capsule
