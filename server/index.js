@@ -204,7 +204,7 @@ app.get('/api/photos/:userId/:filename', authenticateToken, (req, res) => {
 
 // --- Existing Qwen Proxy ---
 const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-const API_KEY = process.env.DASHSCOPE_API_KEY;
+const API_KEY = process.env.DASHSCOPE_API_KEY || 'sk-eba2fce7c20c42af9acb2e2acfaa6760';
 
 if (!API_KEY) {
   console.warn('WARNING: DASHSCOPE_API_KEY is not set. API calls will fail.');

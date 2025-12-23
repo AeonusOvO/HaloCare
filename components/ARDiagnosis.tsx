@@ -486,6 +486,24 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         processor.connect(audioContext.destination); // Needed for Chrome to run the processor
         
         setIsRecording(true);
+        
+        // Auto-stop after 15 seconds
+        setTimeout(() => {
+            if (isRecording) { // Check ref or state? state inside timeout might be stale closure
+               // Best to use a ref for isRecording or just call stopRecording which checks refs
+               // We need to call stopRecording in a way that updates state
+               // Since we are inside a closure, we should rely on refs if possible or just call the function which relies on refs
+               // However, `stopRecording` function relies on `isRecording` state. 
+               // Let's modify stopRecording to check refs or just force stop.
+               
+               // Actually, simpler:
+               if (mediaStreamSourceRef.current) { // If still recording
+                   stopRecording(); 
+                   alert("录音已达到最大时长 (15秒)，自动停止。");
+               }
+            }
+        }, 15000);
+
     } catch (err) {
         console.error("Recording error:", err);
         alert("无法启动录音: " + err);
@@ -493,13 +511,13 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   };
 
   const stopRecording = () => {
-      if (!isRecording) return;
-      
-      // Cleanup Audio Nodes
+      // Cleanup Audio Nodes regardless of isRecording state to force stop from timeout
       if (processorRef.current && mediaStreamSourceRef.current) {
           mediaStreamSourceRef.current.disconnect();
           processorRef.current.disconnect();
           processorRef.current.onaudioprocess = null;
+          processorRef.current = null;
+          mediaStreamSourceRef.current = null;
       }
       
       if (audioContextRef.current) {
@@ -526,6 +544,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
           };
           
           audioContextRef.current.close();
+          audioContextRef.current = null;
       }
       
       setIsRecording(false);
@@ -891,7 +910,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         <h3 className="text-2xl font-serif font-bold text-emerald-900 mb-2 flex items-center gap-2">
            <Ear className="text-emerald-600"/> 闻诊 · 听声息
         </h3>
-        <p className="text-stone-500 mb-8 text-sm">请录制一段您的说话声音（如读一段文字）和几次咳嗽声，供AI分析语调与气息。</p>
+        <p className="text-stone-500 mb-8 text-sm">
+            请录制一段约 <strong>10-15秒</strong> 的音频，内容包括：<br/>
+            1. 自然朗读一段文字（如“你好，我是...”），以分析语调与语速。<br/>
+            2. 用力咳嗽两声，以分析肺气状况。<br/>
+            3. 做几次深呼吸，以分析气息强弱。
+        </p>
 
         {/* Audio Recording Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-6">
@@ -1124,7 +1148,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         ></div>
 
                         {/* Step 1: Connect */}
-                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${analysisProgress >= 25 ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : 'bg-stone-900 border-stone-700 text-stone-600'}`}>
                                 <Zap size={18} />
                             </div>
@@ -1132,7 +1156,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 2: Wang (Vision) */}
-                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wang === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <ScanEye size={18} />
                             </div>
@@ -1140,7 +1164,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 3: Wen (Audio) */}
-                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wen === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wen === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <Ear size={18} />
                             </div>
@@ -1148,7 +1172,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         </div>
 
                         {/* Step 4: Summary */}
-                        <div className="flex flex-col items-center gap-2 relative z-10 bg-stone-900/80 rounded-full">
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${realtimeContent ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'success' && stepStatus.wen === 'success' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
                                 <Activity size={18} />
                             </div>
