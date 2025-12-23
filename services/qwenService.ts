@@ -225,9 +225,10 @@ export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescript
     }
   ];
 
+  // Using qwen3-omni-30b-a3b-captioner
   return callQwen(
     [{ role: 'user', content }],
-    'qwen3-omni-30b-a3b-captioner',
+    'qwen3-omni-30b-a3b-captioner', 
     0.7
   );
 };
