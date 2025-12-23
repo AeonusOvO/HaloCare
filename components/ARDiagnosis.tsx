@@ -598,9 +598,21 @@ const ARDiagnosis: React.FC = () => {
           </div>
         </div>
         <button 
-          disabled={!images.face && !images.tongue}
-          onClick={() => setStep(DiagnosisStep.WEN_AUDIO)}
-          className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
+          onClick={() => {
+              // Strict validation logic
+              if (!images.face) {
+                  alert("请先拍摄或上传面部照片");
+                  setWangType('face');
+                  return;
+              }
+              if (!images.tongue) {
+                  alert("请拍摄或上传舌象照片");
+                  setWangType('tongue');
+                  return;
+              }
+              setStep(DiagnosisStep.WEN_AUDIO);
+          }}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
         >
           下一步 <ChevronRight size={16}/>
         </button>
