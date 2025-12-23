@@ -161,6 +161,19 @@ app.get('/api/diagnosis', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/diagnosis/:id', authenticateToken, async (req, res) => {
+  try {
+    const record = await db.getDiagnosisDetail(req.user.id, req.params.id);
+    res.json(record);
+  } catch (err) {
+    if (err.message.includes('not found')) {
+      res.status(404).json({ error: 'Record not found' });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 app.post('/api/diagnosis', authenticateToken, async (req, res) => {
   try {
     const record = req.body;

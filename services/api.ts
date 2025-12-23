@@ -121,6 +121,14 @@ export const api = {
     return res.json();
   },
 
+  async getDiagnosisDetail(token, id) {
+    const res = await fetch(`${API_BASE}/diagnosis/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
   async saveDiagnosis(token, diagnosis) {
     const res = await fetch(`${API_BASE}/diagnosis`, {
       method: 'POST',

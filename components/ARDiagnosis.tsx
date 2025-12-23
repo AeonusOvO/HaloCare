@@ -215,19 +215,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         setIsLoadingHistory(true);
         try {
             const data = await api.getDiagnosisHistory(token);
-            // Preload images in background without blocking UI
-            data.forEach((item: HistoryItem) => {
-               if (item.images?.face) {
-                   const img = new Image();
-                   img.src = item.images.face;
-                   img.onload = () => setHistoryImagesLoaded(prev => ({...prev, [`${item.id}-face`]: true}));
-               }
-               if (item.images?.tongue) {
-                   const img = new Image();
-                   img.src = item.images.tongue;
-                   img.onload = () => setHistoryImagesLoaded(prev => ({...prev, [`${item.id}-tongue`]: true}));
-               }
-            });
+            // With the new backend logic, data is lightweight (no images)
+            // So we don't need to preload images here anymore, or we can't because we don't have URLs.
+            // The list will render instantly.
             setHistory(data);
         } catch (e) {
             console.error("Failed to load history", e);
@@ -306,7 +296,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
-  const viewHistoryItem = (item: HistoryItem) => {
+  const viewHistoryItem = async (item: HistoryItem) => {
     // Only allow viewing if clicking, but we disable interaction via UI
     // The user requirement is: "If this account has history records, display a loading animation (colored blocks), unclickable."
     // However, the requirement also says: "Resource background download, waiting for resources to download, use a simple animation to show details."
@@ -314,8 +304,27 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     // If the user meant clicking into details, the logic is fine. 
     // Assuming the requirement is about the *list items* themselves loading their content (images/text) smoothly.
     
-    setReport({ content: '', reasoning: '', parsed: item.fullReport });
-    setImages(item.images);
+    // Check if we already have the full details (images etc)
+    let fullItem = item;
+    if (!item.fullReport && !item.images?.face) {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                // Show a global loading indicator or just rely on the fact that the UI is instant if data is small?
+                // But images are large. Let's just fetch it.
+                // Since we are clicking to VIEW, we should probably fetch the full detail now.
+                const detail = await api.getDiagnosisDetail(token, item.id);
+                fullItem = detail;
+            } catch (e) {
+                console.error("Failed to load diagnosis detail", e);
+                alert("无法加载诊断详情");
+                return;
+            }
+        }
+    }
+
+    setReport({ content: '', reasoning: '', parsed: fullItem.fullReport });
+    setImages(fullItem.images);
     changeStep(DiagnosisStep.REPORT);
   };
 
@@ -727,40 +736,20 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         ))
                     ) : (
                         history.map(item => {
-                            // Check if images are fully loaded for this item
-                            // We define "ready" as: text data is always instant (JSON), images are loaded if they exist.
-                            // If an item has no images, it's ready immediately.
-                            const hasFace = !!item.images?.face;
-                            const isFaceLoaded = !hasFace || historyImagesLoaded[`${item.id}-face`];
-                            const isReady = isFaceLoaded; 
+                            // Since we split the data, item.images is null in the list view.
+                            // So we consider it "ready" immediately for the purpose of the list.
+                            // The detail loading happens on click.
+                            const isReady = true; 
 
                             return (
                             <div 
                                 key={item.id}
-                                onClick={() => isReady && viewHistoryItem(item)}
-                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden
-                                    ${isReady 
-                                        ? 'bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in' 
-                                        : 'bg-stone-800/30 border-stone-800 cursor-wait pointer-events-none'
-                                    }`}
+                                onClick={() => viewHistoryItem(item)}
+                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in`}
                             >
-                                {/* Loading Overlay (Color Blocks Animation) */}
-                                {!isReady && (
-                                    <div className="absolute inset-0 z-10 bg-stone-900 flex items-center justify-center gap-1">
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-0"></div>
-                                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce delay-100"></div>
-                                        <div className="w-2 h-2 bg-emerald-700 rounded-full animate-bounce delay-200"></div>
-                                    </div>
-                                )}
-
-                                <div className={`flex items-center gap-4 transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
+                                <div className="flex items-center gap-4">
                                     <div className="p-2 bg-stone-700 rounded-lg relative overflow-hidden">
-                                        {/* Show thumbnail if available */}
-                                        {item.images?.face ? (
-                                            <img src={item.images.face} className="w-5 h-5 object-cover rounded opacity-80" />
-                                        ) : (
-                                            <FileText size={20} className="text-emerald-500"/>
-                                        )}
+                                        <FileText size={20} className="text-emerald-500"/>
                                     </div>
                                     <div>
                                         <p className="font-bold text-stone-200">{item.diagnosis}</p>
@@ -771,14 +760,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                                     </div>
                                 </div>
                                 
-                                {isReady && (
-                                    <button 
-                                        onClick={(e) => deleteHistory(item.id, e)}
-                                        className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <Trash2 size={16}/>
-                                    </button>
-                                )}
+                                <button 
+                                    onClick={(e) => deleteHistory(item.id, e)}
+                                    className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={16}/>
+                                </button>
                             </div>
                         )})
                     )}

@@ -221,34 +221,79 @@ export const db = {
     return family;
   },
 
-  // Diagnosis History Management
+  // Diagnosis History Management (Refactored: Split Index and Details)
   async addDiagnosis(userId, diagnosisRecord) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    let history = [];
-    if (await fs.pathExists(historyPath)) {
-      history = await fs.readJson(historyPath);
+    const userDir = path.join(USERS_DIR, userId);
+    const recordsDir = path.join(userDir, 'diagnosis_records');
+    const indexFile = path.join(userDir, 'diagnosis_index.json');
+    
+    // 1. Ensure directories exist
+    await fs.ensureDir(recordsDir);
+    
+    // 2. Save the full heavy record (with images) to a separate file
+    await fs.writeJson(path.join(recordsDir, `${diagnosisRecord.id}.json`), diagnosisRecord);
+    
+    // 3. Update the lightweight index
+    let index = [];
+    if (await fs.pathExists(indexFile)) {
+      index = await fs.readJson(indexFile);
     }
     
-    // Ensure the new record is at the beginning
-    history.unshift(diagnosisRecord);
-    await fs.writeJson(historyPath, history);
-    return diagnosisRecord;
+    // Create a lightweight summary item
+    const summaryItem = {
+      id: diagnosisRecord.id,
+      date: diagnosisRecord.date,
+      diagnosis: diagnosisRecord.diagnosis,
+      // No images, no fullReport
+    };
+    
+    index.unshift(summaryItem);
+    await fs.writeJson(indexFile, index);
+    
+    return summaryItem;
   },
 
   async getDiagnosisHistory(userId) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    if (!await fs.pathExists(historyPath)) {
+    // Only return the lightweight index
+    const indexFile = path.join(USERS_DIR, userId, 'diagnosis_index.json');
+    if (!await fs.pathExists(indexFile)) {
       return [];
     }
-    return await fs.readJson(historyPath);
+    return await fs.readJson(indexFile);
+  },
+
+  async getDiagnosisDetail(userId, recordId) {
+    // Read the specific full record file
+    const recordFile = path.join(USERS_DIR, userId, 'diagnosis_records', `${recordId}.json`);
+    if (!await fs.pathExists(recordFile)) {
+      throw new Error('Diagnosis record not found');
+    }
+    return await fs.readJson(recordFile);
   },
 
   async deleteDiagnosis(userId, recordId) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    if (!await fs.pathExists(historyPath)) return;
+    const userDir = path.join(USERS_DIR, userId);
+    const recordsDir = path.join(userDir, 'diagnosis_records');
+    const indexFile = path.join(userDir, 'diagnosis_index.json');
     
-    let history = await fs.readJson(historyPath);
-    history = history.filter(item => item.id !== recordId);
-    await fs.writeJson(historyPath, history);
+    // 1. Delete the full record file
+    const recordFile = path.join(recordsDir, `${recordId}.json`);
+    if (await fs.pathExists(recordFile)) {
+      await fs.remove(recordFile);
+    }
+    
+    // 2. Remove from index
+    if (await fs.pathExists(indexFile)) {
+      let index = await fs.readJson(indexFile);
+      index = index.filter(item => item.id !== recordId);
+      
+      if (index.length === 0) {
+          // If no records left, clean up the index file and records dir to keep it "规整"
+          await fs.remove(indexFile);
+          await fs.remove(recordsDir);
+      } else {
+          await fs.writeJson(indexFile, index);
+      }
+    }
   }
 };
