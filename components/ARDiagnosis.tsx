@@ -820,11 +820,11 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         {/* Context Menu Overlay */}
         {activeMenuId && (
             <div 
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in-overlay"
                 onClick={() => setActiveMenuId(null)}
             >
                 <div 
-                    className="bg-stone-800 w-64 rounded-2xl p-4 shadow-2xl border border-stone-700 transform scale-100 animate-in zoom-in-95 duration-200"
+                    className="bg-stone-800 w-64 rounded-2xl p-4 shadow-2xl border border-stone-700 animate-scale-in-modal"
                     onClick={e => e.stopPropagation()}
                 >
                     <h3 className="text-stone-400 text-sm font-bold mb-4 text-center border-b border-stone-700 pb-2">管理记录</h3>
