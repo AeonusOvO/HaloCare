@@ -197,6 +197,34 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Track loaded state for each history item image to enable smooth fade-in
   const [historyImagesLoaded, setHistoryImagesLoaded] = useState<Record<string, boolean>>({});
 
+  // Long Press & Menu State
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPress = useRef(false);
+
+  const handlePressStart = (id: string) => {
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      setActiveMenuId(id);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handlePressMove = () => {
+    if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+    }
+  };
+
   // Sync Step with Active Task
   useEffect(() => {
     if (activeTask) {
@@ -316,11 +344,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
-  const deleteHistory = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm('确定要删除这条诊断记录吗？')) {
+  const deleteHistory = async (id: string) => {
+    // e.stopPropagation(); // No longer needed
+    // if (window.confirm('确定要删除这条诊断记录吗？')) {
       const updatedHistory = history.filter(item => item.id !== id);
       setHistory(updatedHistory);
+      setActiveMenuId(null);
       
       const token = localStorage.getItem('token');
       if (token) {
@@ -330,7 +359,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
               console.error("Failed to delete history", e);
           }
       }
-    }
+    // }
   };
 
   const viewHistoryItem = async (item: HistoryItem) => {
@@ -760,10 +789,16 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                             return (
                             <div 
                                 key={item.id}
+                                onTouchStart={() => handlePressStart(item.id)}
+                                onTouchEnd={handlePressEnd}
+                                onTouchMove={handlePressMove}
+                                onMouseDown={() => handlePressStart(item.id)}
+                                onMouseUp={handlePressEnd}
+                                onMouseLeave={handlePressEnd}
                                 onClick={() => viewHistoryItem(item)}
-                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in`}
+                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in select-none`}
                             >
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-4 pointer-events-none">
                                     <div className="p-2 bg-stone-700 rounded-lg relative overflow-hidden">
                                         <FileText size={20} className="text-emerald-500"/>
                                     </div>
@@ -775,16 +810,38 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                                         </p>
                                     </div>
                                 </div>
-                                
-                                <button 
-                                    onClick={(e) => deleteHistory(item.id, e)}
-                                    className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 size={16}/>
-                                </button>
                             </div>
                         )})
                     )}
+                </div>
+            </div>
+        )}
+
+        {/* Context Menu Overlay */}
+        {activeMenuId && (
+            <div 
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+                onClick={() => setActiveMenuId(null)}
+            >
+                <div 
+                    className="bg-stone-800 w-64 rounded-2xl p-4 shadow-2xl border border-stone-700 transform scale-100 animate-in zoom-in-95 duration-200"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <h3 className="text-stone-400 text-sm font-bold mb-4 text-center border-b border-stone-700 pb-2">管理记录</h3>
+                    <div className="space-y-2">
+                        <button 
+                            onClick={() => deleteHistory(activeMenuId!)}
+                            className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <Trash2 size={18}/> 删除此记录
+                        </button>
+                        <button 
+                            onClick={() => setActiveMenuId(null)}
+                            className="w-full py-3 bg-stone-700/50 hover:bg-stone-700 text-stone-300 rounded-xl font-bold transition-colors"
+                        >
+                            取消
+                        </button>
+                    </div>
                 </div>
             </div>
         )}
