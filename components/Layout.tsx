@@ -48,7 +48,9 @@ const Layout: React.FC<Props> = ({ currentView, onChangeView, children }) => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative flex flex-col">
-        {children}
+        <div key={currentView} className="flex-1 h-full w-full animate-in fade-in slide-in-from-right-4 duration-500 ease-out">
+          {children}
+        </div>
       </main>
 
       {/* Bottom Nav for Mobile */}
