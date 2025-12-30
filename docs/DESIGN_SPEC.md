@@ -114,7 +114,18 @@
 - **场景**:
   - **页面切换**: 渐隐渐现。
   - **表单切换**: 高度平滑过渡 (`grid-template-rows` 动画)。
-  - **悬停**: 元素轻微上浮 (`-translate-y`) 或图标位移。
+  - 悬停: 元素轻微上浮 (`-translate-y`) 或图标位移。
+
+### 7.1 交互反馈 (Interaction Feedback)
+- **Hover State (悬停)**:
+  - 卡片/按钮: `hover:shadow-lg`, `hover:-translate-y-1` (轻微上浮), `hover:bg-emerald-800` (颜色加深)。
+  - 图标: 颜色变化 (如 `text-stone-400` -> `text-emerald-600`)。
+- **Active State (点击)**:
+  - `active:scale-95` 或 `active:scale-[0.98]` (按压微缩效果)。
+- **Focus State (聚焦)**:
+  - 输入框: `focus:ring-4 focus:ring-emerald-600/10 focus:border-emerald-600`。
+- **Loading State (加载)**:
+  - 按钮: 显示 `Loader2` 旋转动画，禁用点击 (`disabled:opacity-50`)。
 
 ---
 

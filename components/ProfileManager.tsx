@@ -161,17 +161,21 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
 
   if (isEditing) {
     return (
-      <div className="bg-white min-h-screen rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
+      <div className="bg-white min-h-screen rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-10 duration-500 flex flex-col h-full absolute inset-0 z-20">
         <div className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-stone-100 p-4 flex items-center justify-between">
-          <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-stone-100 rounded-full transition-colors">
+          <button 
+            onClick={() => setIsEditing(false)} 
+            className="p-2 hover:bg-stone-100 rounded-full transition-all active:scale-90"
+          >
             <ChevronLeft size={24} className="text-stone-600" />
           </button>
           <h2 className="text-lg font-bold text-stone-800">{currentProfile ? '编辑档案' : '新建健康档案'}</h2>
           <div className="w-10"></div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-8 max-w-3xl mx-auto pb-24">
-          {/* Basic Info */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-24">
+          <form onSubmit={handleSubmit} className="p-6 space-y-8 max-w-3xl mx-auto">
+            {/* Basic Info */}
           <section>
             <h3 className="flex items-center gap-2 text-emerald-800 font-bold text-lg mb-4">
               <User size={20} /> 基本信息
@@ -338,11 +342,12 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-emerald-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-800 active:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full py-4 bg-emerald-900 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:bg-emerald-800 active:scale-[0.98] transition-all disabled:opacity-50"
           >
             {loading ? '保存中...' : '保存档案'}
           </button>
         </form>
+        </div>
       </div>
     );
   }
@@ -350,18 +355,21 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
   return (
     <div className="h-full flex flex-col">
       <div className="sticky top-0 bg-[#f7f5f0] z-10 p-4 flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+        <button 
+          onClick={onBack} 
+          className="p-2 hover:bg-black/5 rounded-full transition-all active:scale-90"
+        >
           <ChevronLeft size={24} className="text-stone-600" />
         </button>
         <h1 className="text-2xl font-serif font-bold text-emerald-900">健康档案管理</h1>
       </div>
 
-      <div className="flex-1 p-4 overflow-y-auto pb-24">
+      <div className="flex-1 p-4 overflow-y-auto scrollbar-hide pb-24">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Create New Card */}
           <button 
             onClick={handleCreate}
-            className="min-h-[160px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group"
+            className="min-h-[160px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group active:scale-[0.98]"
           >
             <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center text-stone-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 mb-3 transition-colors">
               <Plus size={24} />
@@ -371,7 +379,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
 
           {/* Profile Cards */}
           {profiles.map(profile => (
-            <div key={profile.id} className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-shadow relative group">
+            <div key={profile.id} className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-all relative group hover:-translate-y-1">
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -387,10 +395,10 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
                   </div>
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleEdit(profile)} className="p-2 bg-stone-50 text-stone-600 rounded-full hover:bg-emerald-100 hover:text-emerald-700">
+                  <button onClick={() => handleEdit(profile)} className="p-2 bg-stone-50 text-stone-600 rounded-full hover:bg-emerald-100 hover:text-emerald-700 transition-colors">
                     <Edit2 size={16} />
                   </button>
-                  <button onClick={() => handleDelete(profile.id)} className="p-2 bg-stone-50 text-stone-600 rounded-full hover:bg-red-100 hover:text-red-700">
+                  <button onClick={() => handleDelete(profile.id)} className="p-2 bg-stone-50 text-stone-600 rounded-full hover:bg-red-100 hover:text-red-700 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
