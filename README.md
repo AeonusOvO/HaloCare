@@ -70,6 +70,15 @@
 - 本项目包含前后端两部分，部署时建议将后端部署至支持 Node.js 的云服务（如阿里云 FC、Vercel Serverless、Render 等），前端构建后部署至静态托管服务（如 Vercel、Netlify、OSS 等）。
 - 生产环境请确保环境变量配置正确。
 
+## 文档 (Documentation)
+
+详细的项目文档已整理至 `docs/` 目录：
+
+- [**设计规范 (Design Spec)**](docs/DESIGN_SPEC.md): UI/UX 设计风格指南。
+- [**运维手册 (Server Manual)**](docs/SERVER_MANUAL.md): 服务器配置、部署与日常运维。
+- [**部署指南 (Deploy Guide)**](docs/DEPLOY.md): 自动化部署流程说明。
+- [**Nginx 配置**](docs/NGINX_CONFIG.md): 反向代理详细配置。
+
 ## 目录结构
 
 ```

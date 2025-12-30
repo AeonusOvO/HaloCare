@@ -179,5 +179,49 @@ export const api = {
     });
     if (!res.ok) throw await res.json();
     return res.json();
+  },
+
+  // Health Profiles (TCM Archives)
+  async getProfiles(token) {
+    const res = await fetch(`${API_BASE}/profiles`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async createProfile(token, profile) {
+    const res = await fetch(`${API_BASE}/profiles`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(profile)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async updateProfile(token, id, updates) {
+    const res = await fetch(`${API_BASE}/profiles/${id}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async deleteProfile(token, id) {
+    const res = await fetch(`${API_BASE}/profiles/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
   }
 };

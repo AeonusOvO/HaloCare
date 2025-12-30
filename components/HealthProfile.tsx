@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { analyzeHealthProfile } from '../services/qwenService';
 import { UserProfile } from '../types';
-import { Activity, Moon, Utensils, Droplet, Thermometer, CheckCircle2, Loader2, LogOut, Users } from 'lucide-react';
+import { LogOut, Users, UserCog, ChevronRight } from 'lucide-react';
 import FamilyManager from './FamilyManager';
+import ProfileManager from './ProfileManager';
 
 interface Props {
   onProfileUpdate: (profile: UserProfile) => void;
@@ -12,213 +12,85 @@ interface Props {
 }
 
 const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout }) => {
-  const [step, setStep] = useState(1); // 1: Form, 2: Result
   const [showFamily, setShowFamily] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: user.username || '',
-    age: '',
-    gender: '男',
-    symptoms: [] as string[],
-    otherSymptom: ''
-  });
-  const [result, setResult] = useState<any>(null);
+  const [showProfiles, setShowProfiles] = useState(false);
 
-  const commonSymptoms = [
-    '失眠多梦', '手脚冰凉', '容易疲劳', '口干舌燥', 
-    '食欲不振', '大便溏稀', '容易上火', '腰膝酸软'
-  ];
-
-  const toggleSymptom = (sym: string) => {
-    setFormData(prev => ({
-      ...prev,
-      symptoms: prev.symptoms.includes(sym) 
-        ? prev.symptoms.filter(s => s !== sym)
-        : [...prev.symptoms, sym]
-    }));
-  };
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    const profile = {
-      name: formData.name,
-      age: parseInt(formData.age),
-      gender: formData.gender,
-      symptoms: formData.otherSymptom ? [...formData.symptoms, formData.otherSymptom] : formData.symptoms
-    };
-    
-    try {
-      const analysis = await analyzeHealthProfile(profile);
-      setResult(analysis);
-      onProfileUpdate({ ...profile, constitution: analysis.constitution, dietPlan: analysis.diet, schedulePlan: analysis.schedule });
-      setStep(2);
-    } catch (e) {
-      alert("分析失败，请重试");
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (showProfiles) {
+    return <ProfileManager token={token} onBack={() => setShowProfiles(false)} />;
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-24">
-      {/* Header with User Controls */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-emerald-900 font-serif">个人中心</h2>
-          <p className="text-sm text-stone-600">欢迎, {user.username}</p>
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setShowFamily(!showFamily)}
-            className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg hover:bg-emerald-200"
-          >
-            <Users size={16} /> 家庭
-          </button>
+    <div className="h-full flex flex-col overflow-hidden bg-[#f7f5f0]">
+      <div className="flex-1 overflow-y-auto scrollbar-hide p-6 pb-24">
+        {/* Header with User Controls */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-emerald-900 font-serif">个人中心</h2>
+            <p className="text-sm text-stone-600">欢迎, {user.username}</p>
+          </div>
           <button 
             onClick={onLogout}
-            className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
+            className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
           >
             <LogOut size={16} /> 退出
           </button>
         </div>
-      </div>
 
-      {showFamily && (
-        <div className="mb-8">
-          <FamilyManager token={token} user={user} onUpdate={() => {}} />
-        </div>
-      )}
-
-      {step === 1 ? (
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold text-emerald-800">中医体质辨识</h3>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-            <h3 className="text-lg font-semibold mb-4 text-emerald-800 flex items-center gap-2">
-              <UserIcon /> 基本信息
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-stone-600 mb-1">姓名</label>
-                <input 
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                  className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-stone-600 mb-1">年龄</label>
-                <input 
-                  type="number"
-                  value={formData.age}
-                  onChange={e => setFormData({...formData, age: e.target.value})}
-                  className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-            </div>
-            <div className="mt-4">
-              <label className="block text-sm text-stone-600 mb-2">性别</label>
-              <div className="flex gap-4">
-                {['男', '女'].map(g => (
-                  <button
-                    key={g}
-                    onClick={() => setFormData({...formData, gender: g})}
-                    className={`px-6 py-2 rounded-lg border ${
-                      formData.gender === g 
-                        ? 'bg-emerald-600 text-white border-emerald-600' 
-                        : 'bg-white text-stone-600 border-stone-300'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-            <h3 className="text-lg font-semibold mb-4 text-emerald-800 flex items-center gap-2">
-              <Activity size={20} /> 近期症状 (可多选)
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {commonSymptoms.map(sym => (
-                <button
-                  key={sym}
-                  onClick={() => toggleSymptom(sym)}
-                  className={`p-2 text-sm rounded-lg border transition-all ${
-                    formData.symptoms.includes(sym)
-                      ? 'bg-emerald-100 border-emerald-500 text-emerald-800 font-medium'
-                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-emerald-300'
-                  }`}
-                >
-                  {sym}
-                </button>
-              ))}
-            </div>
-            <input 
-              placeholder="其他不适症状..."
-              value={formData.otherSymptom}
-              onChange={e => setFormData({...formData, otherSymptom: e.target.value})}
-              className="mt-4 w-full p-2 border border-stone-300 rounded-lg text-sm"
-            />
-          </div>
-
+        {/* Action Cards */}
+        <div className="space-y-4">
+          {/* My Health Profiles Card */}
           <button
-            onClick={handleSubmit}
-            disabled={loading || !formData.name || !formData.age}
-            className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-900 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+            onClick={() => setShowProfiles(true)}
+            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
           >
-            {loading ? <><Loader2 className="animate-spin" /> 正在大模型推演中...</> : '生成健康画像'}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <UserCog size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-lg text-stone-800 group-hover:text-emerald-800 transition-colors">我的健康档案</h3>
+                <p className="text-sm text-stone-500">管理个人及家人的中医健康信息</p>
+              </div>
+            </div>
+            <div className="bg-stone-50 p-2 rounded-full text-stone-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+              <ChevronRight size={20} />
+            </div>
+          </button>
+
+          {/* Family Management Toggle */}
+          <button
+            onClick={() => setShowFamily(!showFamily)}
+            className={`w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group ${showFamily ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <Users size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-lg text-stone-800 group-hover:text-indigo-800 transition-colors">家庭组管理</h3>
+                <p className="text-sm text-stone-500">邀请家人加入，共享健康数据</p>
+              </div>
+            </div>
+            <div className={`bg-stone-50 p-2 rounded-full text-stone-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors ${showFamily ? 'rotate-90' : ''}`}>
+              <ChevronRight size={20} />
+            </div>
           </button>
         </div>
-      ) : (
-        <div>
-          <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-emerald-900">测评结果</h2>
-            <button onClick={() => setStep(1)} className="text-emerald-600 underline text-sm">重新测评</button>
+
+        {/* Family Manager Section */}
+        {showFamily && (
+          <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-300">
+            <FamilyManager token={token} user={user} onUpdate={() => {}} />
           </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-1 bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Activity size={120} />
-              </div>
-              <h3 className="text-emerald-200 text-sm uppercase tracking-wider mb-2">核心体质</h3>
-              <div className="text-4xl font-bold mb-4 font-serif">{result?.constitution || '平和质'}</div>
-              <p className="text-emerald-100 opacity-90 text-sm leading-relaxed mb-6">
-                {result?.analysis}
-              </p>
-            </div>
-
-            <div className="md:col-span-2 space-y-4">
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
-                <div className="bg-amber-100 p-3 rounded-full h-fit text-amber-700">
-                  <Utensils size={24} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-stone-800 mb-1">个性化食疗</h4>
-                  <p className="text-stone-600 text-sm leading-relaxed">{result?.diet}</p>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
-                <div className="bg-indigo-100 p-3 rounded-full h-fit text-indigo-700">
-                  <Moon size={24} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-stone-800 mb-1">作息调养</h4>
-                  <p className="text-stone-600 text-sm leading-relaxed">{result?.schedule}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        )}
+        
+        {/* Placeholder for future features */}
+        <div className="mt-8 p-6 rounded-2xl border-2 border-dashed border-stone-200 text-center text-stone-400">
+          <p className="text-sm">更多健康服务敬请期待...</p>
         </div>
-      )}
+      </div>
     </div>
   );
 };
-
-const UserIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-);
 
 export default HealthProfile;

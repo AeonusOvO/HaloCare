@@ -185,8 +185,10 @@ storage/
 │       ├── notifications.json # 消息通知 (如家庭邀请)
 │       ├── photos/            # 用户上传的原始图片 (预留)
 │       ├── diagnosis_index.json    # [新增] 诊断历史索引 (仅包含 ID、日期、简述，无大图)
-│       └── diagnosis_records/      # [新增] 诊断记录详情目录
-│           └── [recordId].json     # 完整诊断记录 (含 Base64 图片、详细报告)
+│       ├── diagnosis_records/      # [新增] 诊断记录详情目录
+│       │   └── [recordId].json     # 完整诊断记录 (含 Base64 图片、详细报告)
+│       └── health_profiles/        # [新增 v1.2] 健康档案 (TCM Archives)
+│           └── [profileId].json    # 包含十问信息、基本体征、关联诊断ID
 └── user_index.json            # 用户名 -> UserID 的全局映射表
 ```
 

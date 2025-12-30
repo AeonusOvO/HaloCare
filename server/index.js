@@ -233,6 +233,44 @@ app.delete('/api/diagnosis/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// --- Health Profile Routes (TCM Archives) ---
+
+app.get('/api/profiles', authenticateToken, async (req, res) => {
+  try {
+    const profiles = await db.getHealthProfiles(req.user.id);
+    res.json(profiles);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/profiles', authenticateToken, async (req, res) => {
+  try {
+    const profile = await db.createHealthProfile(req.user.id, req.body);
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/profiles/:id', authenticateToken, async (req, res) => {
+  try {
+    const profile = await db.updateHealthProfile(req.user.id, req.params.id, req.body);
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/profiles/:id', authenticateToken, async (req, res) => {
+  try {
+    await db.deleteHealthProfile(req.user.id, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- File Upload ---
 const storage = multer.diskStorage({
   destination: async function (req, file, cb) {

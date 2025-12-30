@@ -295,5 +295,70 @@ export const db = {
           await fs.writeJson(indexFile, index);
       }
     }
+  },
+
+  // Health Profile Management (TCM Archives)
+  async createHealthProfile(userId, profileData) {
+    const userDir = path.join(USERS_DIR, userId);
+    const profilesDir = path.join(userDir, 'health_profiles');
+    await fs.ensureDir(profilesDir);
+
+    const profileId = uuidv4();
+    const newProfile = {
+      id: profileId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...profileData
+    };
+
+    await fs.writeJson(path.join(profilesDir, `${profileId}.json`), newProfile);
+    return newProfile;
+  },
+
+  async getHealthProfiles(userId) {
+    const userDir = path.join(USERS_DIR, userId);
+    const profilesDir = path.join(userDir, 'health_profiles');
+    
+    if (!await fs.pathExists(profilesDir)) {
+      return [];
+    }
+
+    const files = await fs.readdir(profilesDir);
+    const profiles = [];
+    
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const profile = await fs.readJson(path.join(profilesDir, file));
+        profiles.push(profile);
+      }
+    }
+    
+    // Sort by createdAt desc
+    return profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async updateHealthProfile(userId, profileId, updates) {
+    const profilePath = path.join(USERS_DIR, userId, 'health_profiles', `${profileId}.json`);
+    
+    if (!await fs.pathExists(profilePath)) {
+      throw new Error('Health profile not found');
+    }
+
+    const profile = await fs.readJson(profilePath);
+    const updatedProfile = {
+      ...profile,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    await fs.writeJson(profilePath, updatedProfile);
+    return updatedProfile;
+  },
+
+  async deleteHealthProfile(userId, profileId) {
+    const profilePath = path.join(USERS_DIR, userId, 'health_profiles', `${profileId}.json`);
+    if (await fs.pathExists(profilePath)) {
+      await fs.remove(profilePath);
+    }
   }
 };
