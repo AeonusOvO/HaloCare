@@ -353,11 +353,11 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="sticky top-0 bg-[#f7f5f0] z-10 p-4 flex items-center gap-4">
+    <div className="h-full flex flex-col bg-[#f7f5f0]">
+      <div className="sticky top-0 bg-[#f7f5f0]/90 backdrop-blur-md z-10 p-4 flex items-center gap-4 border-b border-stone-200">
         <button 
           onClick={onBack} 
-          className="p-2 hover:bg-black/5 rounded-full transition-all active:scale-90"
+          className="p-2 hover:bg-stone-200/50 rounded-full transition-all active:scale-90"
         >
           <ChevronLeft size={24} className="text-stone-600" />
         </button>
@@ -369,7 +369,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
           {/* Create New Card */}
           <button 
             onClick={handleCreate}
-            className="min-h-[160px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group active:scale-[0.98]"
+            className="min-h-[160px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group active:scale-[0.98] bg-white/50"
           >
             <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center text-stone-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 mb-3 transition-colors">
               <Plus size={24} />
