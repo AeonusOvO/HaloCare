@@ -98,7 +98,7 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
 
       {/* Notifications Section */}
       {notifications.length > 0 && (
-        <div className="mb-8 bg-amber-50 border border-amber-100 p-4 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="mb-8 bg-amber-50 border border-amber-100 p-4 rounded-2xl fade-in">
           <h4 className="flex items-center gap-2 font-bold text-amber-800 mb-3 text-sm">
             <Bell size={16} /> 消息通知
           </h4>
@@ -106,7 +106,7 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
             {notifications.map((n, idx) => (
               <div 
                 key={n.id} 
-                className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-amber-100 animate-in fade-in slide-in-from-left-4 duration-300 fill-mode-backwards"
+                className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-amber-100 list-item-fade"
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
                 <span className="text-sm text-stone-700 font-medium">
@@ -153,7 +153,7 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
               {family.members.map((m: any, idx: number) => (
                 <div 
                   key={m.userId} 
-                  className="flex justify-between items-center p-3 rounded-xl border border-stone-100 hover:border-emerald-200 hover:shadow-sm transition-all bg-white group animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards"
+                  className="flex justify-between items-center p-3 rounded-xl border border-stone-100 hover:border-emerald-200 hover:shadow-sm transition-all bg-white group list-item-fade"
                   style={{ animationDelay: `${idx * 100}ms` }}
                 >
                   <div className="flex items-center gap-3">

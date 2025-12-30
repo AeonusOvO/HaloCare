@@ -17,14 +17,14 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
 
   if (showProfiles) {
     return (
-      <div className="h-full w-full animate-in slide-in-from-right duration-300 ease-out bg-white z-20 absolute inset-0">
+      <div className="h-full w-full page-slide-in bg-white z-20 absolute inset-0">
         <ProfileManager token={token} onBack={() => setShowProfiles(false)} />
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[#f7f5f0] animate-in fade-in zoom-in-[0.99] duration-300">
+    <div className="h-full flex flex-col overflow-hidden bg-[#f7f5f0] page-transition">
       <div className="flex-1 overflow-y-auto scrollbar-hide p-6 pb-24">
         {/* Header with User Controls */}
         <div className="flex justify-between items-center mb-8">

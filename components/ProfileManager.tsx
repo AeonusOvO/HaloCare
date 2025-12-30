@@ -161,7 +161,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
 
   if (isEditing) {
     return (
-      <div className="bg-white min-h-screen rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col h-full absolute inset-0 z-30">
+      <div className="bg-white min-h-screen rounded-t-3xl shadow-2xl modal-slide-up flex flex-col h-full absolute inset-0 z-30">
         <div className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-stone-100 p-4 flex items-center justify-between">
           <button 
             onClick={() => setIsEditing(false)} 
@@ -174,7 +174,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide pb-24">
-          <form onSubmit={handleSubmit} className="p-6 space-y-8 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150 fill-mode-backwards">
+          <form onSubmit={handleSubmit} className="p-6 space-y-8 max-w-3xl mx-auto list-item-fade" style={{ animationDelay: '100ms' }}>
             {/* Basic Info */}
           <section>
             <h3 className="flex items-center gap-2 text-emerald-800 font-bold text-lg mb-4">
@@ -381,7 +381,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
           {profiles.map((profile, index) => (
             <div 
               key={profile.id} 
-              className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-all relative group hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-backwards"
+              className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-all relative group hover:-translate-y-1 list-item-fade"
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <div className="flex justify-between items-start mb-3">

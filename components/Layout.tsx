@@ -48,7 +48,7 @@ const Layout: React.FC<Props> = ({ currentView, onChangeView, children }) => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative flex flex-col">
-        <div key={currentView} className="flex-1 h-full w-full animate-in fade-in zoom-in-[0.99] duration-300 ease-out">
+        <div key={currentView} className="flex-1 h-full w-full page-transition">
           {children}
         </div>
       </main>
