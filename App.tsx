@@ -71,7 +71,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case AppView.HOME:
-        return <Home userProfile={userProfile} onChangeView={setCurrentView} />;
+        return <Home userProfile={userProfile} onChangeView={setCurrentView} token={token} />;
       case AppView.LEARNING:
         return <Learning />;
       case AppView.AI_DIAGNOSIS:
@@ -93,7 +93,7 @@ const App: React.FC = () => {
       case AppView.BUTLER:
         return <AIButler />;
       default:
-        return <Home userProfile={userProfile} onChangeView={setCurrentView} />;
+        return <Home userProfile={userProfile} onChangeView={setCurrentView} token={token} />;
     }
   };
 

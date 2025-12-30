@@ -1,32 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppView, UserProfile } from '../types';
-import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight } from 'lucide-react';
+import { api } from '../services/api';
+import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight, User } from 'lucide-react';
 
 interface Props {
   userProfile: UserProfile | null;
   onChangeView: (view: AppView) => void;
+  token: string;
 }
 
-const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
+const Home: React.FC<Props> = ({ userProfile, onChangeView, token }) => {
   const [isFamilyMode, setIsFamilyMode] = useState(false);
+  const [hasFamily, setHasFamily] = useState(false);
+  const [greeting, setGreeting] = useState('');
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [activeProfile, setActiveProfile] = useState<any>(null);
+  const [showProfileSelector, setShowProfileSelector] = useState(false);
+
+  useEffect(() => {
+    checkFamilyStatus();
+    updateGreeting();
+    loadProfiles();
+  }, []);
+
+  const checkFamilyStatus = async () => {
+    try {
+      const family = await api.getMyFamily(token);
+      setHasFamily(!!family);
+    } catch (err) {
+      console.error(err);
+      setHasFamily(false);
+    }
+  };
+
+  const updateGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('早安');
+    else if (hour < 18) setGreeting('午安');
+    else setGreeting('晚安');
+  };
+
+  const loadProfiles = async () => {
+    try {
+      const data = await api.getProfiles(token);
+      setProfiles(data);
+      if (data.length > 0) {
+        // Default to the most recently updated profile (sorted by backend)
+        setActiveProfile(data[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleProfileSelect = (profile: any) => {
+    setActiveProfile(profile);
+    setShowProfileSelector(false);
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 overflow-y-auto pb-24 h-full">
-      <header className="flex justify-between items-center mb-6 mt-2">
+      <header className="flex justify-between items-center mb-6 mt-2 relative z-20">
         <div>
-           <h1 className="text-2xl font-serif font-bold text-emerald-900">
-             {userProfile ? `早安，${userProfile.name}` : '早安，请完善信息'}
-           </h1>
+           <div 
+             className="relative"
+             onClick={() => profiles.length > 0 && setShowProfileSelector(!showProfileSelector)}
+           >
+             <h1 className="text-2xl font-serif font-bold text-emerald-900 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+               {greeting}，{activeProfile ? activeProfile.name : (userProfile?.name || userProfile?.username || '请完善信息')}
+               {profiles.length > 0 && <ChevronRight size={20} className={`text-emerald-700 transition-transform ${showProfileSelector ? 'rotate-90' : ''}`} />}
+             </h1>
+             
+             {/* Profile Selector Dropdown */}
+             {showProfileSelector && (
+               <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-stone-100 p-2 animate-in fade-in slide-in-from-top-2 z-30">
+                 <div className="text-xs text-stone-400 px-2 py-1 mb-1">切换健康档案</div>
+                 {profiles.map(p => (
+                   <button
+                     key={p.id}
+                     onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}
+                     className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${activeProfile?.id === p.id ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-stone-50 text-stone-700'}`}
+                   >
+                     <span>{p.name}</span>
+                     <span className="text-xs text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded">{p.relation}</span>
+                   </button>
+                 ))}
+               </div>
+             )}
+           </div>
+           
            <p className="text-stone-500 text-sm mt-1">
-             {isFamilyMode ? '正在管理：父母的健康账户' : '您的专属中医健康管家 v1.0.1'}
+             {isFamilyMode ? '正在管理：家庭组健康账户' : '您的专属中医健康管家 v1.0.1'}
            </p>
         </div>
-        <button 
-           onClick={() => setIsFamilyMode(!isFamilyMode)}
-           className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${isFamilyMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-stone-100 text-stone-500 border-stone-200'}`}
-        >
-           {isFamilyMode ? '切换至个人' : '切换至家庭'}
-        </button>
+        
+        {hasFamily && (
+          <button 
+             onClick={() => setIsFamilyMode(!isFamilyMode)}
+             className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${isFamilyMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-stone-100 text-stone-500 border-stone-200'}`}
+          >
+             {isFamilyMode ? '切换至个人' : '切换至家庭'}
+          </button>
+        )}
       </header>
 
       {/* Hero Section: Smart Constitution Identification */}

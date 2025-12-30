@@ -161,11 +161,11 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
 
   if (isEditing) {
     return (
-      <div className="bg-white min-h-screen rounded-t-3xl shadow-2xl modal-slide-up flex flex-col h-full absolute inset-0 z-30">
-        <div className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-stone-100 p-4 flex items-center justify-between">
+      <div className="bg-[#f7f5f0] min-h-screen rounded-t-3xl shadow-2xl modal-slide-up flex flex-col h-full absolute inset-0 z-30">
+        <div className="sticky top-0 bg-[#f7f5f0]/90 backdrop-blur-md z-10 border-b border-stone-200 p-4 flex items-center justify-between">
           <button 
             onClick={() => setIsEditing(false)} 
-            className="p-2 hover:bg-stone-100 rounded-full transition-all active:scale-90"
+            className="p-2 hover:bg-stone-200/50 rounded-full transition-all active:scale-90"
           >
             <ChevronLeft size={24} className="text-stone-600" />
           </button>
