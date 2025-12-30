@@ -98,13 +98,17 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
 
       {/* Notifications Section */}
       {notifications.length > 0 && (
-        <div className="mb-8 bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+        <div className="mb-8 bg-amber-50 border border-amber-100 p-4 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
           <h4 className="flex items-center gap-2 font-bold text-amber-800 mb-3 text-sm">
             <Bell size={16} /> 消息通知
           </h4>
           <div className="space-y-3">
-            {notifications.map(n => (
-              <div key={n.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-amber-100">
+            {notifications.map((n, idx) => (
+              <div 
+                key={n.id} 
+                className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-amber-100 animate-in fade-in slide-in-from-left-4 duration-300 fill-mode-backwards"
+                style={{ animationDelay: `${idx * 100}ms` }}
+              >
                 <span className="text-sm text-stone-700 font-medium">
                   <span className="text-emerald-700 font-bold">{n.fromUsername}</span> 邀请你加入家庭
                 </span>
@@ -146,8 +150,12 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
           <div>
             <h5 className="text-sm font-bold text-stone-500 mb-3 px-1">成员列表</h5>
             <div className="space-y-3">
-              {family.members.map((m: any) => (
-                <div key={m.userId} className="flex justify-between items-center p-3 rounded-xl border border-stone-100 hover:border-emerald-200 hover:shadow-sm transition-all bg-white group">
+              {family.members.map((m: any, idx: number) => (
+                <div 
+                  key={m.userId} 
+                  className="flex justify-between items-center p-3 rounded-xl border border-stone-100 hover:border-emerald-200 hover:shadow-sm transition-all bg-white group animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm ${
                       m.role === 'admin' ? 'bg-emerald-500' : 'bg-stone-400'

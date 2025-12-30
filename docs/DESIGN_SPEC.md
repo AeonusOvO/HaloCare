@@ -128,13 +128,20 @@
   - 按钮: 显示 `Loader2` 旋转动画，禁用点击 (`disabled:opacity-50`)。
 
 ### 7.2 页面转场 (Page Transitions)
-- **全局路由切换**:
-  - 效果: `fade-in slide-in-from-right-4`
-  - 参数: `duration-500 ease-out`
-  - 目的: 提供类似原生 App 的流畅切换体验，明确层级关系。
+- **全局路由切换 (Sibling Views)**:
+  - 效果: `fade-in zoom-in-[0.99]` (Fade + 微缩放)
+  - 参数: `duration-300 ease-out`
+  - 目的: 避免左右滑动的方向困扰，提供稳重的切换感。
+- **层级导航 (Drill-down)**:
+  - 进入: `slide-in-from-right` (从右侧滑入)
+  - 参数: `duration-300 ease-out`
+  - 场景: 列表 -> 详情，主页 -> 功能页。
 - **模态框/弹窗 (Modals)**:
-  - 进入: `slide-in-from-bottom-10` (从底部滑入)
-  - 参数: `duration-500`
+  - 进入: `slide-in-from-bottom` (从底部滑入)
+  - 参数: `duration-300`
+- **列表加载 (List Stagger)**:
+  - 效果: `fade-in slide-in-from-bottom-4`
+  - 延迟: `style={{ animationDelay: '${index * 100}ms' }}` (逐个延迟 100ms)
 
 ---
 
