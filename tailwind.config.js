@@ -2,11 +2,13 @@
 module.exports = {
   content: [
     './index.html',
-    './**/*.{ts,tsx}'
+    './App.tsx',
+    './components/**/*.{ts,tsx}',
+    './contexts/**/*.{ts,tsx}',
+    './services/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {}
   },
   plugins: []
 };
-
