@@ -3,7 +3,8 @@ import { AppView, UserProfile } from '../types';
 import { api } from '../services/api';
 import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight, PhoneCall } from 'lucide-react';
 import { recordImpression, recordClick, sortByPreference, CardId, setModelForUser } from '../utils/personalization';
-import { getTodayFruitRecommendation } from '../utils/seasonal';
+import { getDailyDietRecommendation, DietRecommendation } from '../utils/seasonal';
+import { Flame, Timer, Heart } from 'lucide-react';
 
 interface Props {
   userProfile: UserProfile | null;
@@ -26,8 +27,8 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
     'emotion_regulation',
     'quick_services',
   ]);
-  const fruit = useMemo(() => getTodayFruitRecommendation(), []);
-  const fruitUrl = useMemo(() => `/api/fruit-image?name=${encodeURIComponent(fruit.name)}`, [fruit.name]);
+  const [diet, setDiet] = useState<DietRecommendation | null>(null);
+  const [dietImg, setDietImg] = useState<string>('');
 
   useEffect(() => {
     checkFamilyStatus();
@@ -40,6 +41,21 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
       } catch (_) {}
       setOrderedCards(sortByPreference(userId, orderedCards));
     })();
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `daily_diet_${userId}_${today}`;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const obj = JSON.parse(cached);
+        setDiet(obj);
+        setDietImg(`/api/fruit-image?name=${encodeURIComponent(obj.imageQuery)}`);
+      } else {
+        const rec = getDailyDietRecommendation(`${userId}-${today}`);
+        setDiet(rec);
+        setDietImg(`/api/fruit-image?name=${encodeURIComponent(rec.imageQuery)}`);
+        localStorage.setItem(key, JSON.stringify(rec));
+      }
+    } catch (_) {}
   }, []);
 
   const checkFamilyStatus = async () => {
@@ -214,21 +230,36 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
               <div className="p-2 bg-amber-100 text-amber-600 rounded-lg"><Calendar size={18} /></div>
               <span className="font-bold text-stone-700">时令药膳推荐</span>
             </div>
-            <div className="relative h-40 md:h-52">
-              <img
-                src={fruitUrl}
-                alt={fruit.name}
-                className="w-full h-full object-cover"
-                style={{ filter: fruit.filter }}
-              />
+            <div className="relative h-48 md:h-60">
+              {dietImg && (
+                <img
+                  src={dietImg}
+                  alt={diet?.dish || '药膳'}
+                  className="w-full h-full object-cover"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-stone-900/40 to-transparent" />
-              <div className="absolute bottom-3 left-4 text-white">
-                <div className="text-xs opacity-80">今日果蔬推荐</div>
-                <div className="text-lg font-bold">{fruit.name}</div>
+              <div className="absolute bottom-3 left-4 right-4 text-white">
+                <div className="text-xs opacity-80">今日推荐</div>
+                <div className="text-xl font-bold">{diet?.dish}</div>
+                <div className="mt-1 flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1"><Flame size={12}/> {diet?.kcal} kcal</span>
+                  <span className="flex items-center gap-1"><Timer size={12}/> {diet?.durationMin} min</span>
+                  <span className="flex items-center gap-1"><Heart size={12} className="text-rose-300"/> {diet?.rating?.toFixed(1)}</span>
+                </div>
               </div>
             </div>
-            <div className="p-4 text-sm text-stone-600">
-              今日节气建议：顺应气候，宜清淡适中；如有体寒，可搭配温补食材。
+            <div className="p-4">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(diet?.ingredients || []).map((ing) => (
+                  <span key={ing} className="text-xs px-2 py-1 rounded-full bg-stone-100 text-stone-700 border border-stone-200">{ing}</span>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(diet?.tags || []).map((t) => (
+                  <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{t}</span>
+                ))}
+              </div>
             </div>
           </div>
 
