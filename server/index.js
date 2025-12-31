@@ -324,6 +324,41 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// --- Seasonal Fruit Image Proxy (Mainland-friendly with fallbacks) ---
+app.get('/api/fruit-image', async (req, res) => {
+  try {
+    const name = (req.query.name || '').toString();
+    if (!name) return res.status(400).json({ error: 'Missing name' });
+    const encoded = encodeURIComponent(name);
+    const candidates = [
+      `https://images.weserv.nl/?url=${encodeURIComponent('source.unsplash.com/featured/?' + encoded + ',fruit')}&w=800&h=600&fit=cover`,
+      `https://picsum.photos/seed/${encoded}/800/600`,
+      `https://dummyimage.com/800x600/f7f5f0/2c2c2c.png&text=${encoded}`
+    ];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    let response = null;
+    for (const url of candidates) {
+      try {
+        response = await fetch(url, { signal: controller.signal });
+        if (response && response.ok) {
+          clearTimeout(timeout);
+          const contentType = response.headers.get('content-type') || 'image/jpeg';
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          const buf = Buffer.from(await response.arrayBuffer());
+          res.end(buf);
+          return;
+        }
+      } catch (_) {}
+    }
+    clearTimeout(timeout);
+    res.status(502).json({ error: 'Upstream image providers unavailable' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Habit Model (Cloud Sync) ---
 app.get('/api/habits', authenticateToken, async (req, res) => {
   try {

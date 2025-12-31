@@ -27,6 +27,7 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
     'quick_services',
   ]);
   const fruit = useMemo(() => getTodayFruitRecommendation(), []);
+  const fruitUrl = useMemo(() => `/api/fruit-image?name=${encodeURIComponent(fruit.name)}`, [fruit.name]);
 
   useEffect(() => {
     checkFamilyStatus();
@@ -215,11 +216,10 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
             </div>
             <div className="relative h-40 md:h-52">
               <img
-                src={fruit.imageUrl}
+                src={fruitUrl}
                 alt={fruit.name}
                 className="w-full h-full object-cover"
                 style={{ filter: fruit.filter }}
-                crossOrigin="anonymous"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-stone-900/40 to-transparent" />
               <div className="absolute bottom-3 left-4 text-white">
@@ -315,25 +315,25 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView, token, userId }) => 
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button
-            onClick={() => onChangeView(AppView.AI_DIAGNOSIS)}
+            onClick={(e) => { e.stopPropagation(); onChangeView(AppView.AI_DIAGNOSIS); }}
             className="px-3 py-3 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50 text-stone-700 font-bold text-sm transition"
           >
             一键AI辨证
           </button>
           <button
-            onClick={() => onChangeView(AppView.COMMUNITY)}
+            onClick={(e) => { e.stopPropagation(); onChangeView(AppView.COMMUNITY); }}
             className="px-3 py-3 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50 text-stone-700 font-bold text-sm transition"
           >
             在线问诊
           </button>
           <button
-            onClick={() => onChangeView(AppView.HEALTH_PROFILE)}
+            onClick={(e) => { e.stopPropagation(); onChangeView(AppView.HEALTH_PROFILE); }}
             className="px-3 py-3 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50 text-stone-700 font-bold text-sm transition"
           >
             用药提醒设置
           </button>
           <button
-            onClick={() => recordClick(userId, 'quick_services')}
+            onClick={(e) => { e.stopPropagation(); recordClick(userId, 'quick_services'); }}
             className="px-3 py-3 rounded-xl border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50 text-stone-700 font-bold text-sm transition flex items-center justify-center gap-2"
           >
             <PhoneCall size={16} className="text-emerald-600" /> 紧急联系人

@@ -1,3 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 /* Global Styles & Animations */
 
 /* 1. Page Transition (Tabs) - Subtle Zoom & Fade */
