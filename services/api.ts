@@ -223,5 +223,40 @@ export const api = {
     });
     if (!res.ok) throw await res.json();
     return res.json();
+  },
+
+  // Habits (Cloud Sync)
+  async getHabitModel(token) {
+    const res = await fetch(`${API_BASE}/habits`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async setHabitModel(token, model) {
+    const res = await fetch(`${API_BASE}/habits`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(model || {})
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async recordHabitEvent(token, payload) {
+    const res = await fetch(`${API_BASE}/habits/event`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
   }
 };

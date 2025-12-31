@@ -324,6 +324,36 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// --- Habit Model (Cloud Sync) ---
+app.get('/api/habits', authenticateToken, async (req, res) => {
+  try {
+    const model = await db.getHabitModel(req.user.id);
+    res.json(model);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/habits', authenticateToken, async (req, res) => {
+  try {
+    const saved = await db.setHabitModel(req.user.id, req.body || {});
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/habits/event', authenticateToken, async (req, res) => {
+  try {
+    const { cardId, type } = req.body || {};
+    if (!cardId || !type) return res.status(400).json({ error: 'Missing cardId or type' });
+    const updated = await db.applyHabitEvent(req.user.id, cardId, type);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/chat/completions', async (req, res) => {
   try {
     const { model, messages, temperature, stream, ...rest } = req.body || {};

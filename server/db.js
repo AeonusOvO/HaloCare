@@ -360,5 +360,38 @@ export const db = {
     if (await fs.pathExists(profilePath)) {
       await fs.remove(profilePath);
     }
+  },
+
+  // Habit Model (Cloud Sync)
+  async getHabitModel(userId) {
+    const file = path.join(USERS_DIR, userId, 'habits.json');
+    if (!await fs.pathExists(file)) {
+      return {};
+    }
+    return await fs.readJson(file);
+  },
+
+  async setHabitModel(userId, model) {
+    const userDir = path.join(USERS_DIR, userId);
+    await fs.ensureDir(userDir);
+    const file = path.join(userDir, 'habits.json');
+    await fs.writeJson(file, model);
+    return model;
+  },
+
+  async applyHabitEvent(userId, cardId, type) {
+    const file = path.join(USERS_DIR, userId, 'habits.json');
+    let model = {};
+    if (await fs.pathExists(file)) {
+      model = await fs.readJson(file);
+    }
+    const prev = model[cardId] || { impressions: 0, clicks: 0, lastInteractedAt: 0 };
+    if (type === 'impression') {
+      model[cardId] = { ...prev, impressions: (prev.impressions || 0) + 1 };
+    } else if (type === 'click') {
+      model[cardId] = { impressions: prev.impressions || 0, clicks: (prev.clicks || 0) + 1, lastInteractedAt: Date.now() };
+    }
+    await fs.writeJson(file, model);
+    return model;
   }
 };
