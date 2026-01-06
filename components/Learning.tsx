@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, PlayCircle, Clock, Users, ChevronRight, GraduationCap, Activity, 
   ArrowLeft, Heart, Star, Share2, Play, MessageCircle, Send, ThumbsUp
@@ -8,68 +8,92 @@ import { courses, Course } from '../data/courses';
 const Learning: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'theory' | 'skill'>('all');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [viewingCourse, setViewingCourse] = useState<Course | null>(null);
 
-  const selectedCourse = courses.find(c => c.id === selectedCourseId);
+  // Sync selectedCourseId to viewingCourse, but don't clear viewingCourse immediately when closing
+  // to allow for slide-out animation with content
+  useEffect(() => {
+    if (selectedCourseId) {
+      const course = courses.find(c => c.id === selectedCourseId);
+      if (course) {
+        setViewingCourse(course);
+      }
+    }
+  }, [selectedCourseId]);
 
   const filteredCourses = courses.filter(course => {
     if (activeTab === 'all') return true;
     return course.category === activeTab;
   });
 
-  if (selectedCourse) {
-    return (
-      <CourseDetail 
-        course={selectedCourse} 
-        onBack={() => setSelectedCourseId(null)} 
-      />
-    );
-  }
-
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto pb-24 h-full overflow-y-auto bg-stone-50 animate-in fade-in duration-300">
-      <header className="mb-8">
-        <h1 className="text-2xl font-serif font-bold text-emerald-900 mb-2">中医讲堂</h1>
-        <p className="text-stone-500 text-sm">传承经典，科学养生。探索中医智慧，守护家人健康。</p>
-      </header>
+    <div className="relative w-full h-full overflow-hidden bg-stone-50">
+      {/* 列表页容器 */}
+      <div 
+        className={`absolute inset-0 w-full h-full overflow-y-auto transition-transform duration-300 ease-out ${
+          selectedCourseId ? '-translate-x-[20%] opacity-50 pointer-events-none' : 'translate-x-0'
+        }`}
+      >
+        <div className="p-4 md:p-6 max-w-4xl mx-auto pb-24">
+          <header className="mb-8">
+            <h1 className="text-2xl font-serif font-bold text-emerald-900 mb-2">中医讲堂</h1>
+            <p className="text-stone-500 text-sm">传承经典，科学养生。探索中医智慧，守护家人健康。</p>
+          </header>
 
-      {/* Tabs */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-        <TabButton 
-          active={activeTab === 'all'} 
-          onClick={() => setActiveTab('all')} 
-          label="全部课程" 
-        />
-        <TabButton 
-          active={activeTab === 'theory'} 
-          onClick={() => setActiveTab('theory')} 
-          label="中医课堂" 
-          icon={<BookOpen size={16} />}
-        />
-        <TabButton 
-          active={activeTab === 'skill'} 
-          onClick={() => setActiveTab('skill')} 
-          label="技能教学" 
-          icon={<Activity size={16} />}
-        />
-      </div>
+          {/* Tabs */}
+          <div className="flex space-x-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+            <TabButton 
+              active={activeTab === 'all'} 
+              onClick={() => setActiveTab('all')} 
+              label="全部课程" 
+            />
+            <TabButton 
+              active={activeTab === 'theory'} 
+              onClick={() => setActiveTab('theory')} 
+              label="中医课堂" 
+              icon={<BookOpen size={16} />}
+            />
+            <TabButton 
+              active={activeTab === 'skill'} 
+              onClick={() => setActiveTab('skill')} 
+              label="技能教学" 
+              icon={<Activity size={16} />}
+            />
+          </div>
 
-      {/* Course List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredCourses.map(course => (
-          <CourseCard 
-            key={course.id} 
-            course={course} 
-            onClick={() => setSelectedCourseId(course.id)}
-          />
-        ))}
-      </div>
+          {/* Course List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredCourses.map(course => (
+              <CourseCard 
+                key={course.id} 
+                course={course} 
+                onClick={() => setSelectedCourseId(course.id)}
+              />
+            ))}
+          </div>
 
-      {filteredCourses.length === 0 && (
-        <div className="text-center py-20 text-stone-400">
-          <BookOpen size={48} className="mx-auto mb-4 opacity-50" />
-          <p>暂无相关课程</p>
+          {filteredCourses.length === 0 && (
+            <div className="text-center py-20 text-stone-400">
+              <BookOpen size={48} className="mx-auto mb-4 opacity-50" />
+              <p>暂无相关课程</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* 详情页容器 */}
+      <div 
+        className={`absolute inset-0 w-full h-full bg-stone-50 transition-transform duration-300 ease-out z-20 ${
+          selectedCourseId ? 'translate-x-0 shadow-[-4px_0_16px_rgba(0,0,0,0.1)]' : 'translate-x-full shadow-none'
+        }`}
+      >
+        {viewingCourse && (
+          <CourseDetail 
+            course={viewingCourse} 
+            onBack={() => setSelectedCourseId(null)} 
+          />
+        )}
+      </div>
     </div>
   );
 };
@@ -178,8 +202,16 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeChapter, setActiveChapter] = useState<string>(course.chapters[0]?.id);
 
+  // Reset state when course changes
+  useEffect(() => {
+    setActiveTab('intro');
+    setActiveChapter(course.chapters[0]?.id);
+    setIsLiked(false);
+    setIsFavorited(false);
+  }, [course.id]);
+
   return (
-    <div className="h-full bg-stone-50 overflow-y-auto pb-24 animate-in slide-in-from-right duration-300">
+    <div className="h-full bg-stone-50 overflow-y-auto pb-24">
       {/* Navbar */}
       <div className="bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <button onClick={onBack} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors">
