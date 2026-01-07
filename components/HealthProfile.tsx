@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { LogOut, Users, UserCog, ChevronRight } from 'lucide-react';
+import { LogOut, Users, UserCog, ChevronRight, Grid } from 'lucide-react';
 import FamilyManager from './FamilyManager';
 import ProfileManager from './ProfileManager';
+import IconGallery from './IconGallery';
 
 interface Props {
   onProfileUpdate: (profile: UserProfile) => void;
@@ -14,12 +15,19 @@ interface Props {
 const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout }) => {
   const [showFamily, setShowFamily] = useState(false);
   const [showProfiles, setShowProfiles] = useState(false);
+  const [showIcons, setShowIcons] = useState(false);
 
   if (showProfiles) {
     return (
       <div className="h-full w-full page-slide-in bg-white z-20 absolute inset-0">
         <ProfileManager token={token} onBack={() => setShowProfiles(false)} />
       </div>
+    );
+  }
+
+  if (showIcons) {
+    return (
+      <IconGallery onClose={() => setShowIcons(false)} />
     );
   }
 
@@ -76,6 +84,25 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
               </div>
             </div>
             <div className={`bg-stone-50 p-2 rounded-full text-stone-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors ${showFamily ? 'rotate-90' : ''}`}>
+              <ChevronRight size={20} />
+            </div>
+          </button>
+
+           {/* Icon Gallery (Dev Only) */}
+           <button
+            onClick={() => setShowIcons(true)}
+            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center">
+                <Grid size={24} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-lg text-stone-800 group-hover:text-orange-800 transition-colors">图标库预览</h3>
+                <p className="text-sm text-stone-500">查看项目中使用的所有图标 (开发工具)</p>
+              </div>
+            </div>
+            <div className="bg-stone-50 p-2 rounded-full text-stone-400 group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors">
               <ChevronRight size={20} />
             </div>
           </button>
