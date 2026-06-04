@@ -1,6 +1,11 @@
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  content: string | Array<{
+    type: string;
+    text?: string;
+    image_url?: { url: string };
+    input_audio?: { data: string; format?: string };
+  }>;
   reasoning_content?: string;
 }
 
@@ -32,7 +37,7 @@ export enum AppView {
   COMMUNITY = 'COMMUNITY',
   PROFILE = 'PROFILE',
   // Keep legacy for sub-view or internal routing if needed, or map them to new views
-  HEALTH_PROFILE = 'HEALTH_PROFILE', 
+  HEALTH_PROFILE = 'HEALTH_PROFILE',
   CONSULTATION = 'CONSULTATION',
   BUTLER = 'BUTLER'
 }

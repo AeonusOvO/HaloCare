@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { Activity, AlertCircle, ArrowRight, Eye, EyeOff, HeartPulse, Lock, Mail, ShieldCheck, User, UserPlus } from 'lucide-react';
+import { User, Lock, Mail, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (token: string, user: any) => void;
@@ -12,20 +12,29 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
     setError('');
-    setLoading(true);
+    setIsLoading(true);
+
+    // Simulate a minimum loading time for better UX
+    const minLoadTime = new Promise(resolve => setTimeout(resolve, 800));
+
     try {
       if (isLogin) {
-        const { token, user } = await api.login(username, password);
+        const loginPromise = api.login(username, password);
+        const [{ token, user }] = await Promise.all([loginPromise, minLoadTime]);
         onLogin(token, user);
       } else {
-        const { token, user } = await api.register(username, password, email);
+        const registerPromise = api.register(username, password, email);
+        const [{ token, user }] = await Promise.all([registerPromise, minLoadTime]);
         onLogin(token, user);
       }
     } catch (err: any) {
@@ -33,193 +42,154 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       if (err.error) {
           setError(err.error);
       } else if (err.message && err.message.includes('Failed to fetch')) {
-          setError('无法连接服务器，请稍后重试或联系管理员');
+          setError('无法连接服务器，请确认后端服务已启动');
       } else {
           setError('Authentication failed: ' + (err.message || 'Unknown error'));
       }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const toggleMode = () => {
+    setError('');
+    setIsLogin(!isLogin);
+  };
+
   return (
-    <div className="min-h-dvh bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_32%),linear-gradient(135deg,#f7f5f0_0%,#eef4ef_52%,#dfece7_100%)] text-stone-800 flex items-center justify-center p-4 md:p-8 overflow-hidden">
-      <div className="w-full max-w-6xl grid lg:grid-cols-[1.04fr_0.96fr] gap-5 lg:gap-8 items-stretch">
-        <section className="hidden lg:flex motion-enter min-h-[620px] rounded-[2rem] bg-emerald-950 text-white p-10 relative overflow-hidden shadow-2xl">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-200" />
-          <div className="absolute right-[-90px] bottom-[-80px] text-emerald-700/25 motion-breathe">
-            <HeartPulse size={310} strokeWidth={1.2} />
-          </div>
-          <div className="relative z-10 flex flex-col justify-between w-full">
-            <div>
-              <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shadow-inner">
-                <Activity size={30} className="text-emerald-200" />
-              </div>
-              <h1 className="mt-8 text-5xl font-bold tracking-[0.08em] leading-tight">云脉珍心</h1>
-              <p className="mt-5 text-lg leading-8 text-emerald-50/80 max-w-xl">
-                以四诊合参为主线，面向冠心病初筛演示、体质辨识和家庭健康管理的智能原型。
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#f7f5f0] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute top-0 left-0 w-full h-64 bg-emerald-900/5 -skew-y-3 transform origin-top-left z-0"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-emerald-900/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 z-0"></div>
 
-            <div className="space-y-3 text-sm text-emerald-50/82">
-              {[
-                '望闻问切多模态辨识',
-                '脉诊设备演示连接',
-                '健康画像与调理建议',
-              ].map((item, index) => (
-                <div
-                  key={item}
-                  className={`motion-enter motion-enter-delay-${Math.min(index + 1, 3)} flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3`}
-                >
-                  <ShieldCheck size={18} className="text-emerald-200" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+      <div className={`relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-700 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
 
-        <section className="motion-scale-in bg-white/95 backdrop-blur rounded-[1.75rem] border border-white shadow-[0_24px_80px_rgba(15,23,42,0.14)] p-5 sm:p-8 md:p-10">
-          <div className="flex items-center justify-between gap-3 mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-900 text-emerald-50 flex items-center justify-center shadow-lg shadow-emerald-900/20">
-                <HeartPulse size={25} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-emerald-950">云脉珍心</h2>
-                <p className="text-xs text-stone-500 mt-1">健康管理与科研演示系统</p>
-              </div>
-            </div>
-            <div className="hidden sm:flex rounded-full bg-stone-100 p-1 border border-stone-200">
-              <button
-                type="button"
-                onClick={() => setIsLogin(true)}
-                className={`motion-press px-4 py-2 rounded-full text-sm font-bold transition-colors ${isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-              >
-                登录
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLogin(false)}
-                className={`motion-press px-4 py-2 rounded-full text-sm font-bold transition-colors ${!isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
-              >
-                注册
-              </button>
-            </div>
+        {/* Header Section */}
+        <div className="bg-emerald-900 p-8 pt-12 pb-10 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full opacity-10">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
           </div>
 
-          <div className="mb-7">
-            <h3 className="text-3xl font-bold text-stone-900 mb-2">{isLogin ? '欢迎回来' : '创建账号'}</h3>
-            <p className="text-sm text-stone-500">
-              {isLogin ? '进入您的四诊健康管理工作台。' : '用于保存健康画像、四诊记录和家庭管理信息。'}
+          <div className="relative z-10">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-800 text-emerald-100 mb-4 shadow-lg ring-4 ring-emerald-900/50">
+              <Sparkles size={32} />
+            </div>
+            <h1 className="text-3xl font-serif font-bold text-white tracking-wider mb-2">
+              盒家康
+            </h1>
+            <p className="text-emerald-200 text-xs tracking-[0.2em] uppercase">
+              智慧中医 AI Traditional Medicine
+            </p>
+          </div>
+        </div>
+
+        {/* Form Section */}
+        <div className="p-8">
+          <div className="mb-6 text-center">
+            <h2 className="text-2xl font-bold text-stone-800 mb-1">
+              {isLogin ? '欢迎回来' : '创建账号'}
+            </h2>
+            <p className="text-stone-500 text-sm">
+              {isLogin ? '请登录您的账号以继续' : '开启您的智慧中医健康之旅'}
             </p>
           </div>
 
           {error && (
-            <div className="motion-enter mb-5 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <AlertCircle size={17} className="mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm flex items-start gap-3 animate-pulse">
+              <div className="mt-0.5">⚠️</div>
+              <div>{error}</div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-stone-700 mb-2">用户名</label>
-              <div className="relative">
-                <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-4">
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition-colors">
+                  <User size={20} />
+                </div>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
-                  className="w-full h-[52px] rounded-2xl border border-stone-200 bg-stone-50/80 pl-11 pr-4 py-3 text-stone-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className="w-full pl-12 pr-4 py-3.5 bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all duration-300 placeholder:text-stone-400 text-stone-700"
+                  placeholder="用户名"
                   required
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-bold text-stone-700 mb-2">密码</label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition-colors">
+                  <Lock size={20} />
+                </div>
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                  className="w-full h-[52px] rounded-2xl border border-stone-200 bg-stone-50/80 pl-11 pr-12 py-3 text-stone-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className="w-full pl-12 pr-4 py-3.5 bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all duration-300 placeholder:text-stone-400 text-stone-700"
+                  placeholder="密码"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="motion-press absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
-            </div>
 
-            {!isLogin && (
-              <div className="motion-enter">
-                <label className="block text-sm font-bold text-stone-700 mb-2">邮箱</label>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    className="w-full h-[52px] rounded-2xl border border-stone-200 bg-stone-50/80 pl-11 pr-4 py-3 text-stone-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-                    required
-                  />
+              <div className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${!isLogin ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                <div className="overflow-hidden">
+                  <div className="relative group pt-1"> {/* Added padding top to account for grid gap if needed, but grid handles layout */}
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-emerald-600 transition-colors">
+                      <Mail size={20} />
+                    </div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3.5 bg-stone-50 border border-stone-200 rounded-xl focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all duration-300 placeholder:text-stone-400 text-stone-700"
+                      placeholder="电子邮箱"
+                      required={!isLogin}
+                    />
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="motion-press w-full mt-2 h-[52px] rounded-2xl bg-emerald-900 text-white font-bold shadow-xl shadow-emerald-900/20 hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="w-full bg-emerald-900 text-white py-3.5 rounded-xl font-medium shadow-lg hover:shadow-xl hover:bg-emerald-800 active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 group mt-2"
             >
-              {isLogin ? <ArrowRight size={18} /> : <UserPlus size={18} />}
-              {loading ? '正在处理...' : (isLogin ? '进入工作台' : '完成注册')}
+              {isLoading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  {isLogin ? '登录' : '注册'}
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 
-          <div className="sm:hidden mt-6 grid grid-cols-2 gap-2 rounded-2xl bg-stone-100 p-1 border border-stone-200">
-            <button
-              type="button"
-              onClick={() => setIsLogin(true)}
-              className={`motion-press rounded-xl py-2 text-sm font-bold ${isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-500'}`}
-            >
-              登录
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsLogin(false)}
-              className={`motion-press rounded-xl py-2 text-sm font-bold ${!isLogin ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-500'}`}
-            >
-              注册
-            </button>
+          <div className="mt-8 text-center">
+            <p className="text-stone-500 text-sm">
+              {isLogin ? '还没有账号？' : '已有账号？'}
+              <button
+                onClick={toggleMode}
+                className="ml-2 text-emerald-700 font-bold hover:text-emerald-900 hover:underline underline-offset-4 transition-colors focus:outline-none"
+              >
+                {isLogin ? '立即注册' : '直接登录'}
+              </button>
+            </p>
           </div>
+        </div>
+      </div>
 
-          <p className="mt-6 text-center text-sm text-stone-500">
-            {isLogin ? '还没有账号？' : '已有账号？'}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="motion-press ml-2 font-bold text-emerald-700 hover:text-emerald-900"
-            >
-              {isLogin ? '创建账号' : '返回登录'}
-            </button>
-          </p>
-
-          <p className="mt-7 border-t border-stone-100 pt-5 text-center text-xs leading-6 text-stone-400">
-            本系统仅用于健康管理和科研演示，不作为临床诊断依据。
-          </p>
-        </section>
+      {/* Footer info */}
+      <div className="absolute bottom-6 text-stone-400 text-xs text-center w-full">
+        &copy; {new Date().getFullYear()} 盒家康智慧中医系统. All rights reserved.
       </div>
     </div>
   );

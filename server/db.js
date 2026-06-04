@@ -18,14 +18,14 @@ const init = async () => {
   await fs.ensureDir(STORAGE_DIR);
   await fs.ensureDir(USERS_DIR);
   await fs.ensureDir(FAMILIES_DIR);
-  
+
   console.log(`[DB] Storage directory initialized at: ${STORAGE_DIR}`);
   console.log(`[DB] Users directory: ${USERS_DIR}`);
 
   if (!await fs.pathExists(USER_INDEX_FILE)) {
     await fs.writeJson(USER_INDEX_FILE, {});
   }
-  
+
   // Create default root user only when explicitly enabled for local dev/testing.
   const index = await fs.readJson(USER_INDEX_FILE);
   if (shouldCreateDefaultRootUser && !index['root']) {
@@ -47,7 +47,7 @@ const init = async () => {
 
     await fs.writeJson(path.join(userDir, 'profile.json'), profile);
     await fs.writeJson(path.join(userDir, 'notifications.json'), []);
-    
+
     index['root'] = userId;
     await fs.writeJson(USER_INDEX_FILE, index);
     console.log('Root user created: username="root", password="root"');
@@ -81,7 +81,7 @@ export const db = {
 
     await fs.writeJson(path.join(userDir, 'profile.json'), profile);
     await fs.writeJson(path.join(userDir, 'notifications.json'), []);
-    
+
     // Update index
     index[username] = userId;
     await fs.writeJson(USER_INDEX_FILE, index);
@@ -126,7 +126,7 @@ export const db = {
     };
 
     await fs.writeJson(path.join(FAMILIES_DIR, `${familyId}.json`), family);
-    
+
     // Update creator's profile
     await this.updateUser(creatorId, { familyId, role: 'admin' });
 
@@ -175,7 +175,7 @@ export const db = {
     const notifPath = path.join(USERS_DIR, userId, 'notifications.json');
     const notifs = await fs.readJson(notifPath);
     const notifIndex = notifs.findIndex(n => n.id === notificationId);
-    
+
     if (notifIndex === -1) throw new Error('Notification not found');
     const notif = notifs[notifIndex];
 
@@ -189,7 +189,7 @@ export const db = {
           joinedAt: new Date().toISOString()
         });
         await fs.writeJson(path.join(FAMILIES_DIR, `${notif.familyId}.json`), family);
-        
+
         // Update user profile
         await this.updateUser(userId, { familyId: notif.familyId, role: 'member' });
       }
@@ -198,59 +198,202 @@ export const db = {
     // Remove notification (or mark handled)
     notifs.splice(notifIndex, 1);
     await fs.writeJson(notifPath, notifs);
-    
+
     return { success: true };
   },
-  
+
   async updateMemberRole(adminId, targetUserId, newRole) {
     const admin = await this.getUser(adminId);
     if (!admin.familyId) throw new Error('Not in a family');
-    
+
     const family = await this.getFamily(admin.familyId);
     // Check if admin is actually admin
     const adminMember = family.members.find(m => m.userId === adminId);
     if (!adminMember || adminMember.role !== 'admin') throw new Error('Permission denied');
-    
+
     const targetMember = family.members.find(m => m.userId === targetUserId);
     if (!targetMember) throw new Error('User not in family');
-    
+
     targetMember.role = newRole;
     await fs.writeJson(path.join(FAMILIES_DIR, `${admin.familyId}.json`), family);
-    
+
     // Update target user profile as well
     await this.updateUser(targetUserId, { role: newRole });
-    
+
     return family;
   },
 
-  // Diagnosis History Management
+  // Diagnosis History Management (Refactored: Split Index and Details)
   async addDiagnosis(userId, diagnosisRecord) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    let history = [];
-    if (await fs.pathExists(historyPath)) {
-      history = await fs.readJson(historyPath);
+    const userDir = path.join(USERS_DIR, userId);
+    const recordsDir = path.join(userDir, 'diagnosis_records');
+    const indexFile = path.join(userDir, 'diagnosis_index.json');
+
+    // 1. Ensure directories exist
+    await fs.ensureDir(recordsDir);
+
+    // 2. Save the full heavy record (with images) to a separate file
+    await fs.writeJson(path.join(recordsDir, `${diagnosisRecord.id}.json`), diagnosisRecord);
+
+    // 3. Update the lightweight index
+    let index = [];
+    if (await fs.pathExists(indexFile)) {
+      index = await fs.readJson(indexFile);
     }
-    
-    // Ensure the new record is at the beginning
-    history.unshift(diagnosisRecord);
-    await fs.writeJson(historyPath, history);
-    return diagnosisRecord;
+
+    // Create a lightweight summary item
+    const summaryItem = {
+      id: diagnosisRecord.id,
+      date: diagnosisRecord.date,
+      diagnosis: diagnosisRecord.diagnosis,
+      // No images, no fullReport
+    };
+
+    index.unshift(summaryItem);
+    await fs.writeJson(indexFile, index);
+
+    return summaryItem;
   },
 
   async getDiagnosisHistory(userId) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    if (!await fs.pathExists(historyPath)) {
+    // Only return the lightweight index
+    const indexFile = path.join(USERS_DIR, userId, 'diagnosis_index.json');
+    if (!await fs.pathExists(indexFile)) {
       return [];
     }
-    return await fs.readJson(historyPath);
+    return await fs.readJson(indexFile);
+  },
+
+  async getDiagnosisDetail(userId, recordId) {
+    // Read the specific full record file
+    const recordFile = path.join(USERS_DIR, userId, 'diagnosis_records', `${recordId}.json`);
+    if (!await fs.pathExists(recordFile)) {
+      throw new Error('Diagnosis record not found');
+    }
+    return await fs.readJson(recordFile);
   },
 
   async deleteDiagnosis(userId, recordId) {
-    const historyPath = path.join(USERS_DIR, userId, 'diagnosis_history.json');
-    if (!await fs.pathExists(historyPath)) return;
-    
-    let history = await fs.readJson(historyPath);
-    history = history.filter(item => item.id !== recordId);
-    await fs.writeJson(historyPath, history);
+    const userDir = path.join(USERS_DIR, userId);
+    const recordsDir = path.join(userDir, 'diagnosis_records');
+    const indexFile = path.join(userDir, 'diagnosis_index.json');
+
+    // 1. Delete the full record file
+    const recordFile = path.join(recordsDir, `${recordId}.json`);
+    if (await fs.pathExists(recordFile)) {
+      await fs.remove(recordFile);
+    }
+
+    // 2. Remove from index
+    if (await fs.pathExists(indexFile)) {
+      let index = await fs.readJson(indexFile);
+      index = index.filter(item => item.id !== recordId);
+
+      if (index.length === 0) {
+          // If no records left, clean up the index file and records dir to keep it "规整"
+          await fs.remove(indexFile);
+          await fs.remove(recordsDir);
+      } else {
+          await fs.writeJson(indexFile, index);
+      }
+    }
+  },
+
+  // Health Profile Management (TCM Archives)
+  async createHealthProfile(userId, profileData) {
+    const userDir = path.join(USERS_DIR, userId);
+    const profilesDir = path.join(userDir, 'health_profiles');
+    await fs.ensureDir(profilesDir);
+
+    const profileId = uuidv4();
+    const newProfile = {
+      id: profileId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...profileData
+    };
+
+    await fs.writeJson(path.join(profilesDir, `${profileId}.json`), newProfile);
+    return newProfile;
+  },
+
+  async getHealthProfiles(userId) {
+    const userDir = path.join(USERS_DIR, userId);
+    const profilesDir = path.join(userDir, 'health_profiles');
+
+    if (!await fs.pathExists(profilesDir)) {
+      return [];
+    }
+
+    const files = await fs.readdir(profilesDir);
+    const profiles = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const profile = await fs.readJson(path.join(profilesDir, file));
+        profiles.push(profile);
+      }
+    }
+
+    // Sort by createdAt desc
+    return profiles.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async updateHealthProfile(userId, profileId, updates) {
+    const profilePath = path.join(USERS_DIR, userId, 'health_profiles', `${profileId}.json`);
+
+    if (!await fs.pathExists(profilePath)) {
+      throw new Error('Health profile not found');
+    }
+
+    const profile = await fs.readJson(profilePath);
+    const updatedProfile = {
+      ...profile,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    await fs.writeJson(profilePath, updatedProfile);
+    return updatedProfile;
+  },
+
+  async deleteHealthProfile(userId, profileId) {
+    const profilePath = path.join(USERS_DIR, userId, 'health_profiles', `${profileId}.json`);
+    if (await fs.pathExists(profilePath)) {
+      await fs.remove(profilePath);
+    }
+  },
+
+  // Habit Model (Cloud Sync)
+  async getHabitModel(userId) {
+    const file = path.join(USERS_DIR, userId, 'habits.json');
+    if (!await fs.pathExists(file)) {
+      return {};
+    }
+    return await fs.readJson(file);
+  },
+
+  async setHabitModel(userId, model) {
+    const userDir = path.join(USERS_DIR, userId);
+    await fs.ensureDir(userDir);
+    const file = path.join(userDir, 'habits.json');
+    await fs.writeJson(file, model);
+    return model;
+  },
+
+  async applyHabitEvent(userId, cardId, type) {
+    const file = path.join(USERS_DIR, userId, 'habits.json');
+    let model = {};
+    if (await fs.pathExists(file)) {
+      model = await fs.readJson(file);
+    }
+    const prev = model[cardId] || { impressions: 0, clicks: 0, lastInteractedAt: 0 };
+    if (type === 'impression') {
+      model[cardId] = { ...prev, impressions: (prev.impressions || 0) + 1 };
+    } else if (type === 'click') {
+      model[cardId] = { impressions: prev.impressions || 0, clicks: (prev.clicks || 0) + 1, lastInteractedAt: Date.now() };
+    }
+    await fs.writeJson(file, model);
+    return model;
   }
 };

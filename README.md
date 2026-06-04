@@ -74,7 +74,7 @@ Capacitor 原生环境会自动切到 `https://www.yunmai.life/api`。修改正�
 
 ## 部署入口
 
-完整部署步骤见 [DEPLOY.md](DEPLOY.md)，Nginx 配置见 [NGINX_CONFIG.md](NGINX_CONFIG.md)，日常运维见 [SERVER_MANUAL.md](SERVER_MANUAL.md)。
+完整部署步骤见 [docs/DEPLOY.md](docs/DEPLOY.md)，Nginx 配置见 [docs/NGINX_CONFIG.md](docs/NGINX_CONFIG.md)，日常运维见 [docs/SERVER_MANUAL.md](docs/SERVER_MANUAL.md)。
 
 ## 技术方法
 

@@ -51,10 +51,21 @@ pm2 -v
 
 ## 3. 上传源码
 
-从本地打包时排除旧数据和依赖目录：
+推荐使用 GitHub Actions 自动部署：推送到 `master` 或手动触发 `.github/workflows/deploy.yml` 后，工作流会打包干净源码、上传到 `/tmp/halocare-release.tgz`，在服务器保留 `/var/www/HaloCare/storage` 和 `/var/www/HaloCare/server/.env` 后执行根目录 `deploy.sh`。
+
+仓库需要配置 Secrets：
+
+- `SERVER_HOST=43.163.215.149`
+- `SERVER_USER=ubuntu`
+- `SERVER_SSH_KEY`：`Hongkong_ssh.pem` 对应私钥内容
+- `SERVER_PORT=22`（可选）
+
+不得把 `.pem`、`.env`、`storage/` 或真实用户数据提交到 GitHub。
+
+如需手动兜底部署，从本地打包时排除旧数据、密钥、IDE 状态和依赖目录：
 
 ```powershell
-tar --exclude=.git --exclude=node_modules --exclude=server/node_modules --exclude=dist --exclude=storage -czf halocare-release.tgz .
+tar --exclude=.git --exclude=node_modules --exclude=server/node_modules --exclude=dist --exclude=storage --exclude=server/.env --exclude=*.pem --exclude=android/.idea -czf halocare-release.tgz .
 scp -i Hongkong_ssh.pem halocare-release.tgz ubuntu@43.163.215.149:/tmp/
 ```
 

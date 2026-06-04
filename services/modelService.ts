@@ -1,17 +1,18 @@
 import { Message } from '../types';
 import { getApiBase } from './apiBase';
 
-const API_BASE = getApiBase();
-const CHAT_COMPLETIONS_URL = `${API_BASE}/chat/completions`;
+const BASE_URL = `${getApiBase()}/chat/completions`;
 
-export const callModel = async (
+export const callQwen = async (
   messages: Message[],
   model: string = 'qwen-vl-max',
   temperature: number = 0.7,
   onStreamUpdate?: (content: string, reasoning: string) => void,
-  onConnect?: () => void
+  onConnect?: () => void,
+  extraBody?: any // Add extraBody support
 ): Promise<{ content: string; reasoning: string }> => {
   const controller = new AbortController();
+  // Set a 60-second timeout to prevent indefinite hanging
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
@@ -20,12 +21,10 @@ export const callModel = async (
       messages: messages,
       stream: !!onStreamUpdate,
       temperature: temperature,
-      // Keep optional thinking controls disabled for compatibility with the multimodal endpoint.
-      // enable_thinking: true, 
-      // thinking_budget: 10240 
+      ...extraBody // Spread extraBody into the request body
     };
 
-    const response = await fetch(CHAT_COMPLETIONS_URL, {
+    const response = await fetch(BASE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -40,10 +39,21 @@ export const callModel = async (
       let errorMessage = 'API request failed';
       try {
         const errorData = await response.json();
+        // Extract specific DashScope/OpenAI error messages
         errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        console.error("Model API Error Data:", errorData);
+        console.error("Qwen API Error Data:", errorData);
       } catch (e) {
-        errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
+        // Try to read text response if JSON parse fails
+        try {
+           const errorText = await response.text();
+           errorMessage = `HTTP Error ${response.status} ${response.statusText} - Body: ${errorText.substring(0, 200)}`;
+        } catch (e2) {
+           errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
+        }
+      }
+      // If we got an upstream 413, clarify it for the user
+      if (errorMessage.includes('Upstream') && errorMessage.includes('413')) {
+          errorMessage = '音频文件过大，超出云端服务限制。请尝试录制更短的音频（建议10秒以内）。';
       }
       throw new Error(errorMessage);
     }
@@ -64,7 +74,7 @@ export const callModel = async (
         const trimmedLine = line.trim();
         if (!trimmedLine) return false;
         if (trimmedLine === 'data: [DONE]') return true;
-        
+
         if (trimmedLine.startsWith('data: ')) {
           try {
             const jsonStr = trimmedLine.substring(6);
@@ -103,7 +113,7 @@ export const callModel = async (
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; 
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (processLine(line)) {
@@ -126,7 +136,7 @@ export const callModel = async (
     }
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error("Model API Error:", error);
+    console.error("Qwen API Error:", error);
     if (error.name === 'AbortError') {
       throw new Error("请求超时，请检查网络或重试");
     }
@@ -134,13 +144,15 @@ export const callModel = async (
   }
 };
 
+export const callModel = callQwen;
+
 export const analyzeHealthProfile = async (profile: any) => {
   const prompt = `
     作为一位资深中医专家，请根据以下用户数据构建精准健康画像（体质辨识）：
     症状: ${profile.symptoms.join(', ')}
     年龄: ${profile.age}
     性别: ${profile.gender}
-    
+
     请输出JSON格式:
     {
       "constitution": "体质名称 (如: 阴虚质)",
@@ -150,8 +162,9 @@ export const analyzeHealthProfile = async (profile: any) => {
     }
     只返回JSON，不要markdown标记。
   `;
-  
-  const result = await callModel([{ role: 'user', content: prompt }], 'qwen-plus');
+
+  // Use qwen-plus for pure text analysis as it's faster and cheaper, or qwen-vl-max
+  const result = await callQwen([{ role: 'user', content: prompt }], 'qwen-plus');
   try {
     const cleanJson = result.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanJson);
@@ -164,4 +177,119 @@ export const analyzeHealthProfile = async (profile: any) => {
       schedule: "建议规律作息"
     };
   }
+};
+
+// --- New AI Diagnosis Flow Helpers ---
+
+export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: string) => {
+  const content: any[] = [
+    { type: 'text', text: `你是一位资深中医专家。请仔细观察提供的面部和舌象照片，进行专业的“望诊”分析。
+
+请重点识别并详细描述以下内容（不要遗漏细节）：
+
+1. **望面（面诊）**：
+   - **面色**：识别主色（如青、赤、黄、白、黑）与客色，判断是否有光泽（得神/失神）。
+   - **神态**：观察眼神是否明亮、精神状态（如疲惫、亢奋）。
+   - **局部特征**：眼周（黑眼圈、浮肿）、口唇（颜色、干裂）、皮肤纹理。
+
+2. **望舌（舌诊）**：
+   - **舌神**：荣枯（有神/无神）。
+   - **舌色**：淡白、淡红、红、绛、紫（是否有瘀斑/瘀点）。
+   - **舌形**：老嫩、胖大（有无齿痕）、瘦薄、裂纹、芒刺。
+   - **舌态**：强硬、震颤、歪斜。
+   - **舌苔**：颜色（白、黄、灰黑）、质地（厚薄、润燥、腻腐、剥落）。
+   - **舌下络脉**：是否有怒张或青紫。
+
+请输出一份结构清晰、术语专业的望诊报告。` }
+  ];
+
+  if (faceImage) content.push({ type: 'image_url', image_url: { url: faceImage } });
+  if (tongueImage) content.push({ type: 'image_url', image_url: { url: tongueImage } });
+
+  return callQwen(
+    [{ role: 'user', content }],
+    'qwen-vl-max',
+    0.7,
+    undefined,
+    undefined
+  );
+};
+
+export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescription: string) => {
+  // Qwen3-Omni-30B-A3B-Captioner only supports audio input and does not accept text prompts.
+  // We will get the audio caption/analysis first, and then combine it with user description in the final diagnosis.
+  const content: any[] = [
+    {
+      type: 'input_audio',
+      input_audio: {
+        data: `data:audio/wav;base64,${audioBase64}`,
+        format: 'wav'
+      }
+    }
+  ];
+
+  // Using qwen3-omni-30b-a3b-captioner
+  return callQwen(
+    [{ role: 'user', content }],
+    'qwen3-omni-30b-a3b-captioner',
+    0.7
+  );
+};
+
+export const generateFinalDiagnosis = async (
+  wangResult: string,
+  wenResult: string,
+  wenUserDescription: string,
+  inquiryData: any,
+  qieData: string,
+  onStreamUpdate?: (content: string, reasoning: string) => void,
+  onConnect?: () => void
+) => {
+    const prompt = `
+    你是一位经验丰富的中医临床专家（Expert TCM Doctor）。现在需要根据“四诊合参”的信息，为患者进行完整的辨证论治。
+
+    以下是四诊采集的详细数据：
+
+    1. 【望诊信息】(由 Healon 视觉分析):
+    ${wangResult}
+
+    2. 【闻诊信息】(由 Healon 听觉分析):
+    - 音频特征分析: ${wenResult}
+    - 用户主观描述: ${wenUserDescription}
+
+    3. 【问诊信息】(十问歌):
+    ${JSON.stringify(inquiryData, null, 2)}
+
+    4. 【切诊信息】:
+    ${qieData || '（线上问诊无脉象数据，请根据脉症从舍原则，侧重舌脉互参进行推断）'}
+
+    ---
+    **任务要求**：
+    请综合分析以上信息，进行严谨的逻辑推演，生成一份专业的中医诊断报告。
+
+    **注意**：
+    1. **拒绝套话**：不要说“建议咨询医生”之类的废话，直接给出基于当前信息的专业判断。
+    2. **辨证精准**：必须明确指出“证型”。
+    3. **病机分析**：详细解释为什么是这个证型？结合具体的舌象、脉象（如有）、症状进行关联分析。
+    4. **调理方案**：给出的建议必须针对该证型，不要给出通用的“多喝水、多运动”。
+
+    请严格按照以下 JSON 格式输出，不要包含任何 markdown 标记，直接返回纯 JSON 字符串：
+    {
+      "diagnosis": "核心辨证结论",
+      "pathology": "核心病机分析（300字左右，深度解析病因病机，关联四诊信息）",
+      "suggestions": {
+        "diet": "针对性的食疗建议（推荐具体食材和食谱，忌口什么）",
+        "lifestyle": "针对性的起居调摄（如具体的运动方式、作息时间、情志调节）",
+        "acupoints": "精准的穴位推荐（2-3个核心穴位，并说明按摩或艾灸方法）"
+      }
+    }
+    `;
+
+    return callQwen(
+        [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+        'qwen3-max',
+        0.7,
+        onStreamUpdate,
+        onConnect
+    );
 };

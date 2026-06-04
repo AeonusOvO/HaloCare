@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
-import { callModel } from '../services/modelService';
+import { analyzeImageWithQwenVL, analyzeAudioWithQwenOmni } from '../services/modelService';
 import { api } from '../services/api';
 import { Message } from '../types';
+import { useDiagnosis, DiagnosisTask } from '../contexts/DiagnosisContext';
 
 // Steps of the TCM Diagnosis Flow
 enum DiagnosisStep {
@@ -16,8 +17,6 @@ enum DiagnosisStep {
 }
 
 type WangType = 'face' | 'tongue';
-
-const DEMO_PULSE_READING = '演示设备已连接：脉率 78 次/分，节律较齐；脉象模拟为弦细，按之略弱。';
 
 // Structured Report Interface
 interface DiagnosisReport {
@@ -47,12 +46,12 @@ const resizeImage = (dataUrl: string, maxWidth: number = 800): Promise<string> =
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      
+
       if (width > maxWidth) {
         height = (maxWidth / width) * height;
         width = maxWidth;
       }
-      
+
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
@@ -73,18 +72,71 @@ const SlideTransition: React.FC<{
 
   return (
     <div
-      aria-hidden={position !== 'center'}
-      className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out transform ${position !== 'center' ? 'pointer-events-none invisible opacity-0' : 'pointer-events-auto visible opacity-100'} ${translateClass}`}
+      className={`absolute inset-0 transition-transform duration-500 ease-in-out transform ${translateClass}`}
     >
       {children}
     </div>
   );
 };
 
+// Simple WAV Encoder Helper
+const encodeWAV = (samples: Float32Array, sampleRate: number) => {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  // RIFF identifier
+  writeString(view, 0, 'RIFF');
+  // file length
+  view.setUint32(4, 36 + samples.length * 2, true);
+  // RIFF type
+  writeString(view, 8, 'WAVE');
+  // format chunk identifier
+  writeString(view, 12, 'fmt ');
+  // format chunk length
+  view.setUint32(16, 16, true);
+  // sample format (raw)
+  view.setUint16(20, 1, true);
+  // channel count
+  view.setUint16(22, 1, true);
+  // sample rate
+  view.setUint32(24, sampleRate, true);
+  // byte rate (sample rate * block align)
+  view.setUint32(28, sampleRate * 2, true);
+  // block align (channel count * bytes per sample)
+  view.setUint16(32, 2, true);
+  // bits per sample
+  view.setUint16(34, 16, true);
+  // data chunk identifier
+  writeString(view, 36, 'data');
+  // data chunk length
+  view.setUint32(40, samples.length * 2, true);
+
+  const floatTo16BitPCM = (output: DataView, offset: number, input: Float32Array) => {
+    for (let i = 0; i < input.length; i++, offset += 2) {
+      let s = Math.max(-1, Math.min(1, input[i]));
+      s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      output.setInt16(offset, s, true);
+    }
+  };
+
+  floatTo16BitPCM(view, 44, samples);
+
+  return buffer;
+};
+
 const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
+  // Use Global Diagnosis Context
+  const { activeTask, startDiagnosis, clearTask, minimized } = useDiagnosis();
+
   // Debug log to verify version
   useEffect(() => {
-    console.log("ARDiagnosis Component Loaded - Version: Fix-v5-SmartTransition");
+    console.log("ARDiagnosis Component Loaded - Version: Fix-v8-AsyncTasks");
   }, []);
 
   // ... (Camera & Stream State, Data State, Result State, History State remain unchanged)
@@ -92,6 +144,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState(false);
   const [cameraErrorMsg, setCameraErrorMsg] = useState('');
@@ -99,11 +154,23 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // Diagnosis Flow State
   const [step, setStep] = useState<DiagnosisStep>(DiagnosisStep.INTRO);
   const [wangType, setWangType] = useState<WangType>('face');
-  
+
   // Data State
   const [images, setImages] = useState<{ face: string | null, tongue: string | null }>({ face: null, tongue: null });
-  const [wenAudioText, setWenAudioText] = useState('');
-  const [isListening, setIsListening] = useState(false);
+  const [wenAudioText, setWenAudioText] = useState(''); // User manual description
+  const [audioBase64, setAudioBase64] = useState<string | null>(null); // Recorded audio
+  const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false); // Legacy flag for speech recognition visual
+
+  // Intermediate Analysis Results
+  const [wangResult, setWangResult] = useState<string>('');
+  const [wenResult, setWenResult] = useState<string>('');
+  const [stepStatus, setStepStatus] = useState<{
+    wang: 'idle' | 'loading' | 'success' | 'error',
+    wen: 'idle' | 'loading' | 'success' | 'error'
+  }>({ wang: 'idle', wen: 'idle' });
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+
   const [inquiryData, setInquiryData] = useState({
     hanRe: '', // Cold/Hot
     han: '',   // Sweat
@@ -115,32 +182,94 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     other: '' // Other
   });
   const [qieData, setQieData] = useState(''); // Pulse input (optional)
-  const [pulseDemoConnected, setPulseDemoConnected] = useState(false);
-  
+
   // Result State
   const [report, setReport] = useState<{content: string, reasoning: string, parsed?: DiagnosisReport} | null>(null);
   const [realtimeReasoning, setRealtimeReasoning] = useState(''); // For streaming display
   const [realtimeContent, setRealtimeContent] = useState(''); // For streaming display
   const [isConnected, setIsConnected] = useState(false); // To track if API has responded
   const [error, setError] = useState<string | null>(null); // Track errors
-  
+
   // History State
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isIntroShifted, setIsIntroShifted] = useState(false);
+  // Track loaded state for each history item image to enable smooth fade-in
+  const [historyImagesLoaded, setHistoryImagesLoaded] = useState<Record<string, boolean>>({});
+
+  // Long Press & Menu State
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPress = useRef(false);
+
+  const handlePressStart = (id: string) => {
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      setActiveMenuId(id);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handlePressMove = () => {
+    if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+    }
+  };
+
+  // Sync Step with Active Task
+  useEffect(() => {
+    if (activeTask) {
+        // If task is processing, jump to Analysis/Report step
+        if (activeTask.status === 'processing') {
+            if (activeTask.step === 'report') {
+                setStep(DiagnosisStep.ANALYSIS); // Keep in analysis view until done? Or Report view?
+                // Actually Report view is better if we have intermediate progress
+                // But our UI structure puts streaming in ANALYSIS step UI.
+                setStep(DiagnosisStep.ANALYSIS);
+                setAnalysisProgress(activeTask.progress);
+            } else {
+                setStep(DiagnosisStep.ANALYSIS);
+                setAnalysisProgress(activeTask.progress);
+            }
+        } else if (activeTask.status === 'completed') {
+            // Task done, show result
+            if (activeTask.result) {
+                setReport({
+                    content: activeTask.result.fullReport?.content || '',
+                    reasoning: activeTask.result.fullReport?.reasoning || '',
+                    parsed: activeTask.result.fullReport
+                });
+                setImages(activeTask.result.images || { face: null, tongue: null });
+                setStep(DiagnosisStep.REPORT);
+            }
+        } else if (activeTask.status === 'failed') {
+            setError(activeTask.error || '任务失败');
+            setStep(DiagnosisStep.ANALYSIS);
+        }
+    }
+  }, [activeTask]);
 
   // Transition Helper Logic
   const getSlidePosition = (targetStep: DiagnosisStep) => {
       // Group Analysis and Report as effectively the same step for transition purposes
       const normalize = (s: DiagnosisStep) => (s === DiagnosisStep.REPORT ? DiagnosisStep.ANALYSIS : s);
-      
+
       const normTarget = normalize(targetStep);
       const normCurrent = normalize(step);
 
       if (normTarget === normCurrent) return 'center';
       return normTarget < normCurrent ? 'left' : 'right';
   };
-  
+
   const changeStep = (newStep: DiagnosisStep) => {
       setStep(newStep);
   };
@@ -151,6 +280,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         setIsLoadingHistory(true);
         try {
             const data = await api.getDiagnosisHistory(token);
+            // With the new backend logic, data is lightweight (no images)
+            // So we don't need to preload images here anymore, or we can't because we don't have URLs.
+            // The list will render instantly.
             setHistory(data);
         } catch (e) {
             console.error("Failed to load history", e);
@@ -198,10 +330,10 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       fullReport: parsedReport,
       images: images // Save images for reference
     };
-    
+
     // Optimistic update
     setHistory([newItem, ...history]);
-    
+
     const token = localStorage.getItem('token');
     if (token) {
         try {
@@ -212,12 +344,13 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
-  const deleteHistory = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm('确定要删除这条分析记录吗？')) {
+  const deleteHistory = async (id: string) => {
+    // e.stopPropagation(); // No longer needed
+    // if (window.confirm('确定要删除这条诊断记录吗？')) {
       const updatedHistory = history.filter(item => item.id !== id);
       setHistory(updatedHistory);
-      
+      setActiveMenuId(null);
+
       const token = localStorage.getItem('token');
       if (token) {
           try {
@@ -226,12 +359,38 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
               console.error("Failed to delete history", e);
           }
       }
-    }
+    // }
   };
 
-  const viewHistoryItem = (item: HistoryItem) => {
-    setReport({ content: '', reasoning: '', parsed: item.fullReport });
-    setImages(item.images);
+  const viewHistoryItem = async (item: HistoryItem) => {
+    // Only allow viewing if clicking, but we disable interaction via UI
+    // The user requirement is: "If this account has history records, display a loading animation (colored blocks), unclickable."
+    // However, the requirement also says: "Resource background download, waiting for resources to download, use a simple animation to show details."
+    // This likely means the *Intro* view history list itself should load gracefully.
+    // If the user meant clicking into details, the logic is fine.
+    // Assuming the requirement is about the *list items* themselves loading their content (images/text) smoothly.
+
+    // Check if we already have the full details (images etc)
+    let fullItem = item;
+    if (!item.fullReport && !item.images?.face) {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                // Show a global loading indicator or just rely on the fact that the UI is instant if data is small?
+                // But images are large. Let's just fetch it.
+                // Since we are clicking to VIEW, we should probably fetch the full detail now.
+                const detail = await api.getDiagnosisDetail(token, item.id);
+                fullItem = detail;
+            } catch (e) {
+                console.error("Failed to load diagnosis detail", e);
+                alert("无法加载诊断详情");
+                return;
+            }
+        }
+    }
+
+    setReport({ content: '', reasoning: '', parsed: fullItem.fullReport });
+    setImages(fullItem.images);
     changeStep(DiagnosisStep.REPORT);
   };
 
@@ -261,11 +420,11 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       }
 
       try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false 
+          audio: false
         });
-        
+
         if (isCancelled) {
             mediaStream.getTracks().forEach(track => track.stop());
             return;
@@ -277,7 +436,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         setCameraErrorMsg('');
       } catch (err: any) {
         if (isCancelled) return;
-        console.warn("Camera access warning:", err);
+        console.error("Camera error:", err);
         setPermissionError(true);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
             setCameraErrorMsg('摄像头权限被拒绝，请允许访问。');
@@ -288,9 +447,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         }
       }
     };
-    
+
     if (step === DiagnosisStep.WANG && !stream) startCamera();
-    
+
     return () => {
       isCancelled = true;
       if (activeStream) {
@@ -322,18 +481,18 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
     const context = canvas.getContext('2d');
     if (!context) return;
-    
+
     // Scale down for faster upload (max 800px width)
     const scale = Math.min(1, 800 / video.videoWidth);
     canvas.width = video.videoWidth * scale;
     canvas.height = video.videoHeight * scale;
-    
+
     // Mirror the capture to match the mirrored preview
     context.translate(canvas.width, 0);
     context.scale(-1, 1);
-    
+
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     setImages(prev => ({ ...prev, [wangType]: dataUrl }));
   };
@@ -362,13 +521,18 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       fileInputRef.current?.click();
   };
 
-  // --- Voice Input Logic (Web Speech API) ---
-  const toggleListening = () => {
+  // --- Voice Input Logic (Web Speech API + Manual WAV Recording) ---
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioDataRef = useRef<Float32Array[]>([]);
+
+  const toggleSpeechToText = () => {
     if (isListening) {
       setIsListening(false);
       return;
     }
-    
+
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       const recognition = new SpeechRecognition();
@@ -393,104 +557,153 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
+  const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Use AudioContext for raw PCM access to encode as WAV
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
+
+        const source = audioContext.createMediaStreamSource(stream);
+        mediaStreamSourceRef.current = source;
+
+        // Buffer size 4096, 1 input channel, 1 output channel
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        processorRef.current = processor;
+
+        audioDataRef.current = [];
+
+        processor.onaudioprocess = (e) => {
+            const channelData = e.inputBuffer.getChannelData(0);
+            audioDataRef.current.push(new Float32Array(channelData));
+        };
+
+        source.connect(processor);
+        processor.connect(audioContext.destination); // Needed for Chrome to run the processor
+
+        setIsRecording(true);
+
+        // Auto-stop after 15 seconds
+        setTimeout(() => {
+            if (isRecording) { // Check ref or state? state inside timeout might be stale closure
+               // Best to use a ref for isRecording or just call stopRecording which checks refs
+               // We need to call stopRecording in a way that updates state
+               // Since we are inside a closure, we should rely on refs if possible or just call the function which relies on refs
+               // However, `stopRecording` function relies on `isRecording` state.
+               // Let's modify stopRecording to check refs or just force stop.
+
+               // Actually, simpler:
+               if (mediaStreamSourceRef.current) { // If still recording
+                   stopRecording();
+                   alert("录音已达到最大时长 (15秒)，自动停止。");
+               }
+            }
+        }, 15000);
+
+    } catch (err) {
+        console.error("Recording error:", err);
+        alert("无法启动录音: " + err);
+    }
+  };
+
+  const stopRecording = () => {
+      // Cleanup Audio Nodes regardless of isRecording state to force stop from timeout
+      if (processorRef.current && mediaStreamSourceRef.current) {
+          mediaStreamSourceRef.current.disconnect();
+          processorRef.current.disconnect();
+          processorRef.current.onaudioprocess = null;
+          processorRef.current = null;
+          mediaStreamSourceRef.current = null;
+      }
+
+      if (audioContextRef.current) {
+          const sampleRate = audioContextRef.current.sampleRate;
+
+          // Flatten audio data
+          const totalLength = audioDataRef.current.reduce((acc, chunk) => acc + chunk.length, 0);
+          const result = new Float32Array(totalLength);
+          let offset = 0;
+          for (const chunk of audioDataRef.current) {
+              result.set(chunk, offset);
+              offset += chunk.length;
+          }
+
+          // Encode to WAV
+          const wavBuffer = encodeWAV(result, sampleRate);
+
+          // Convert to Base64
+          const reader = new FileReader();
+          reader.readAsDataURL(new Blob([wavBuffer], { type: 'audio/wav' }));
+          reader.onloadend = () => {
+              const base64String = (reader.result as string).split(',')[1];
+              setAudioBase64(base64String);
+          };
+
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+      }
+
+      setIsRecording(false);
+  };
+
+  const toggleRecording = () => {
+      if (isRecording) {
+          stopRecording();
+      } else {
+          startRecording();
+      }
+  };
+
   // --- Analysis Logic ---
-  const startAnalysis = async (pulseOverride?: string) => {
+  const isRunningAnalysis = useRef(false);
+
+  // REMOVED: useEffect dependency on step to trigger analysis
+  // We will trigger it directly from the button click
+
+  const triggerAnalysis = async () => {
+    if (isRunningAnalysis.current) return;
+    isRunningAnalysis.current = true;
+
+    // 1. Update UI to "Analysis" mode immediately
     changeStep(DiagnosisStep.ANALYSIS);
     setRealtimeReasoning('');
     setRealtimeContent('');
     setIsConnected(false);
     setError(null);
-    const effectiveQieData = pulseOverride ?? qieData;
-    
-    const userPromptText = `
-    我正在进行中医“望闻问切”综合辨识。请根据以下信息进行辨证分析：
-
-    1. 【望诊】(参考上传的图片):
-       - 请分析面色、神态。
-       - 请分析舌质、舌苔。
-    
-    2. 【闻诊】(声音/气味/咳嗽描述):
-       ${wenAudioText || '用户未提供详细描述，请根据其他信息推断。'}
-
-    3. 【问诊】(十问歌):
-       - 寒热: ${inquiryData.hanRe}
-       - 汗液: ${inquiryData.han}
-       - 头身: ${inquiryData.touShen}
-       - 二便: ${inquiryData.bian}
-       - 饮食: ${inquiryData.yinShi}
-       - 胸腹: ${inquiryData.xiong}
-       - 口渴/听力: ${inquiryData.ke}
-       - 其他: ${inquiryData.other}
-
-    4. 【切诊】(脉象):
-       ${effectiveQieData || '当前未连接脉诊设备，未采集到脉象数据。请基于望闻问三诊进行推断。'}
-
-    请务必严格按照以下 JSON 格式输出辨识结果，不要包含任何 markdown 标记（如 \`\`\`json 或 \`\`\`），直接返回纯 JSON 字符串。JSON 结构如下：
-    {
-      "diagnosis": "核心辨证结论",
-      "pathology": "核心病机分析",
-      "suggestions": {
-        "diet": "饮食调理建议",
-        "lifestyle": "作息与运动建议",
-        "acupoints": "推荐穴位及按摩方法"
-      }
-    }
-    `;
-
-    const contentParts: any[] = [{ type: 'text', text: userPromptText }];
-    
-    if (images.face) contentParts.push({ type: 'image_url', image_url: { url: images.face } });
-    if (images.tongue) contentParts.push({ type: 'image_url', image_url: { url: images.tongue } });
+    setAnalysisProgress(25);
 
     try {
-      const messages: Message[] = [{ role: 'user', content: contentParts }];
-      
-      let finalContent = '';
-      let finalReasoning = '';
-      
-      // Use streaming to show progress
-      const res = await callModel(
-        messages, 
-        'qwen-vl-max',
-        0.7, 
-        (content, reasoning) => {
-          finalContent = content;
-          finalReasoning = reasoning;
-          setRealtimeContent(content);
-          setRealtimeReasoning(reasoning);
-        },
-        () => setIsConnected(true) // onConnect
-      );
-      
-      // Double check in case stream loop returned early
-      finalContent = res.content || finalContent;
-      finalReasoning = res.reasoning || finalReasoning;
+      // 2. Collect all data
+      const inputData = {
+          wangResult: wangResult || "（系统提示：望诊分析尚未生成，可能由于网络原因或处理延迟）",
+          wenResult: wenResult || "（系统提示：闻诊分析尚未生成）",
+          wenAudioText,
+          inquiryData,
+          qieData,
+          images // Pass images to persist them in the result later
+      };
 
-      let parsedData: DiagnosisReport | undefined;
-      try {
-          const cleanJson = finalContent.replace(/```json/g, '').replace(/```/g, '').trim();
-          parsedData = JSON.parse(cleanJson);
-      } catch (e) {
-          console.warn("Failed to parse JSON response, falling back to raw text", e);
-      }
+      // 3. Start Async Task via Context
+      console.log("Starting diagnosis task with data:", inputData);
+      await startDiagnosis(inputData);
+      console.log("Diagnosis task started successfully");
 
-      setReport({ content: finalContent, reasoning: finalReasoning, parsed: parsedData });
-      if (parsedData) {
-          saveToHistory(parsedData);
-      }
-      changeStep(DiagnosisStep.REPORT);
+      // The useEffect([activeTask]) will take over from here to update progress
+
     } catch (error: any) {
-      console.error(error);
-      // Instead of resetting to QIE immediately, we show the error state
+      console.error("Failed to start diagnosis:", error);
       setError(error.message || '请求失败，请检查网络连接');
+      isRunningAnalysis.current = false; // Allow retry
     }
   };
 
-  const connectDemoPulseAndAnalyze = () => {
-    setPulseDemoConnected(true);
-    setQieData(DEMO_PULSE_READING);
-    startAnalysis(DEMO_PULSE_READING);
-  };
+  useEffect(() => {
+    if (step !== DiagnosisStep.ANALYSIS) return;
+    // ... UI progress logic for legacy/fallback ...
+  }, [step, stepStatus, error, realtimeContent]);
+
+  // REMOVED: runFinalDiagnosis (logic moved to triggerAnalysis)
 
   // --- Navigation Helper ---
   const goBack = () => {
@@ -517,23 +730,33 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             <h2 className="text-3xl font-serif font-bold mb-4">望闻问切 · 智能辨证</h2>
             <p className="text-stone-400 max-w-md mb-8 leading-relaxed text-center">
                 系统将引导您完成中医四诊流程。<br/>
-                利用大模型视觉能力分析面色与舌象，结合问诊信息，生成健康管理参考报告。
+                利用大模型视觉能力分析面色与舌象，结合问诊信息，为您生成精准的健康报告。
             </p>
-            <button 
-                onClick={() => {
-                    // Reset all data for new diagnosis
-                    setImages({ face: null, tongue: null });
-                    setWenAudioText('');
-                    setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
-                    setQieData('');
-                    setPulseDemoConnected(false);
-                    setStream(null); // Ensure stream is reset
-                    changeStep(DiagnosisStep.WANG);
-                }}
-                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
-            >
-                开始新辨识 <ChevronRight />
-            </button>
+            {activeTask && ['pending', 'processing'].includes(activeTask.status) ? (
+                 <button
+                    disabled
+                    className="px-8 py-4 bg-stone-700 text-stone-400 rounded-full font-bold text-lg cursor-not-allowed flex items-center gap-2"
+                >
+                    <Loader2 className="animate-spin"/> 正在辩证中...
+                </button>
+            ) : (
+                <button
+                    onClick={() => {
+                        // Reset all data for new diagnosis
+                        setImages({ face: null, tongue: null });
+                        setWenAudioText('');
+                        setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
+                        setQieData('');
+                        setStream(null); // Ensure stream is reset
+                        // Clear any old task state
+                        clearTask();
+                        changeStep(DiagnosisStep.WANG);
+                    }}
+                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
+                >
+                    开始新诊断 <ChevronRight />
+                </button>
+            )}
         </div>
 
         {/* History Section */}
@@ -557,14 +780,26 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                             </div>
                         ))
                     ) : (
-                        history.map(item => (
-                            <div 
+                        history.map(item => {
+                            // Since we split the data, item.images is null in the list view.
+                            // So we consider it "ready" immediately for the purpose of the list.
+                            // The detail loading happens on click.
+                            const isReady = true;
+
+                            return (
+                            <div
                                 key={item.id}
+                                onTouchStart={() => handlePressStart(item.id)}
+                                onTouchEnd={handlePressEnd}
+                                onTouchMove={handlePressMove}
+                                onMouseDown={() => handlePressStart(item.id)}
+                                onMouseUp={handlePressEnd}
+                                onMouseLeave={handlePressEnd}
                                 onClick={() => viewHistoryItem(item)}
-                                className="bg-stone-800/50 hover:bg-stone-800 border border-stone-700 p-4 rounded-xl cursor-pointer transition-all flex items-center justify-between group animate-fade-in"
+                                className={`relative border p-4 rounded-xl transition-all flex items-center justify-between group overflow-hidden bg-stone-800/50 hover:bg-stone-800 border-stone-700 cursor-pointer animate-fade-in select-none`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2 bg-stone-700 rounded-lg">
+                                <div className="flex items-center gap-4 pointer-events-none">
+                                    <div className="p-2 bg-stone-700 rounded-lg relative overflow-hidden">
                                         <FileText size={20} className="text-emerald-500"/>
                                     </div>
                                     <div>
@@ -575,15 +810,38 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                                         </p>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={(e) => deleteHistory(item.id, e)}
-                                    className="p-2 text-stone-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 size={16}/>
-                                </button>
                             </div>
-                        ))
+                        )})
                     )}
+                </div>
+            </div>
+        )}
+
+        {/* Context Menu Overlay */}
+        {activeMenuId && (
+            <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in-overlay"
+                onClick={() => setActiveMenuId(null)}
+            >
+                <div
+                    className="bg-stone-800 w-64 rounded-2xl p-4 shadow-2xl border border-stone-700 animate-scale-in-modal"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <h3 className="text-stone-400 text-sm font-bold mb-4 text-center border-b border-stone-700 pb-2">管理记录</h3>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => deleteHistory(activeMenuId!)}
+                            className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <Trash2 size={18}/> 删除此记录
+                        </button>
+                        <button
+                            onClick={() => setActiveMenuId(null)}
+                            className="w-full py-3 bg-stone-700/50 hover:bg-stone-700 text-stone-300 rounded-xl font-bold transition-colors"
+                        >
+                            取消
+                        </button>
+                    </div>
                 </div>
             </div>
         )}
@@ -605,23 +863,23 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       {/* Camera View */}
       <div className="relative flex-1 overflow-hidden bg-stone-900">
         {!permissionError ? (
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" 
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
           />
         ) : (
            /* Fallback when no camera */
           <div className="flex flex-col h-full items-center justify-center text-stone-500 p-6 text-center">
-             <AlertCircle className="mb-4 text-red-500" size={48}/> 
+             <AlertCircle className="mb-4 text-red-500" size={48}/>
              <p className="text-lg font-bold mb-2 text-stone-300">无法启动摄像头</p>
              <p className="text-sm text-stone-400 max-w-xs mb-4">{cameraErrorMsg || '未检测到摄像头或权限被拒绝'}</p>
              <p className="text-sm bg-stone-800 px-4 py-2 rounded-lg">请点击下方 <Upload size={14} className="inline mx-1"/> 按钮上传照片</p>
           </div>
         )}
-        
+
         {/* Overlays */}
         {!permissionError && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -641,31 +899,31 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         {/* Capture Controls */}
         <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-6 z-10 pointer-events-auto">
           <div className="flex bg-black/40 backdrop-blur rounded-full p-1 border border-white/10">
-            <button 
+            <button
               onClick={() => setWangType('face')}
               className={`px-6 py-2 rounded-full text-sm font-bold transition-colors ${wangType === 'face' ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:text-white'}`}
             >
               望面色
             </button>
-            <button 
+            <button
               onClick={() => setWangType('tongue')}
               className={`px-6 py-2 rounded-full text-sm font-bold transition-colors ${wangType === 'tongue' ? 'bg-pink-600 text-white' : 'text-stone-300 hover:text-white'}`}
             >
               望舌象
             </button>
           </div>
-          
+
           <div className="flex items-center gap-8">
-             <input 
-                type="file" 
+             <input
+                type="file"
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
                 onChange={handleFileUpload}
              />
-             
+
              {/* Upload Button */}
-             <button 
+             <button
                onClick={triggerFileUpload}
                className="w-14 h-14 rounded-full bg-stone-800 border border-stone-600 flex items-center justify-center hover:bg-stone-700 active:scale-95 transition-all text-stone-300"
                title="上传照片"
@@ -675,7 +933,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
              {/* Capture Button - Only if no error */}
              {!permissionError && (
-                 <button 
+                 <button
                     onClick={captureImage}
                     className="w-20 h-20 rounded-full border-4 border-white/80 bg-white/20 hover:bg-white/40 active:scale-95 transition-all flex items-center justify-center"
                  >
@@ -683,11 +941,11 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                  </button>
              )}
 
-             <div className="w-14 h-14" /> 
+             <div className="w-14 h-14" />
           </div>
-          
+
           <p className="text-xs text-stone-400 bg-black/50 px-3 py-1 rounded-full">
-            {permissionError ? '请上传照片进行辨识' : '点击拍照或上传照片'}
+            {permissionError ? '请上传照片进行诊断' : '点击拍照或上传照片'}
           </p>
         </div>
       </div>
@@ -695,14 +953,14 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       {/* Thumbnails */}
       <div className="h-24 bg-stone-900 border-t border-stone-800 flex items-center justify-between px-6 z-20">
         <div className="flex gap-4">
-          <div 
+          <div
             onClick={() => setWangType('face')}
             className={`relative w-16 h-16 rounded-lg border overflow-hidden cursor-pointer transition-colors ${wangType === 'face' ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-stone-700 bg-stone-800'}`}
           >
              {images.face ? <img src={images.face} className="w-full h-full object-cover" /> : <div className="flex items-center justify-center h-full text-stone-600 text-xs">面部</div>}
              {images.face && <div className="absolute bottom-0 right-0 bg-emerald-500 text-white p-0.5"><Check size={10}/></div>}
           </div>
-          <div 
+          <div
             onClick={() => setWangType('tongue')}
             className={`relative w-16 h-16 rounded-lg border overflow-hidden cursor-pointer transition-colors ${wangType === 'tongue' ? 'border-pink-500 ring-2 ring-pink-500/30' : 'border-stone-700 bg-stone-800'}`}
           >
@@ -710,7 +968,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
              {images.tongue && <div className="absolute bottom-0 right-0 bg-emerald-500 text-white p-0.5"><Check size={10}/></div>}
           </div>
         </div>
-        <button 
+        <button
           onClick={() => {
               // Strict validation logic
               if (!images.face) {
@@ -723,7 +981,22 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                   setWangType('tongue');
                   return;
               }
+
               changeStep(DiagnosisStep.WEN_AUDIO);
+
+              // Trigger background Wang Analysis
+              if (stepStatus.wang === 'idle' || stepStatus.wang === 'error') {
+                  setStepStatus(prev => ({ ...prev, wang: 'loading' }));
+                  analyzeImageWithQwenVL(images.face, images.tongue)
+                    .then(res => {
+                        setWangResult(res.content);
+                        setStepStatus(prev => ({ ...prev, wang: 'success' }));
+                    })
+                    .catch(e => {
+                        console.error("Wang Analysis Failed", e);
+                        setStepStatus(prev => ({ ...prev, wang: 'error' }));
+                    });
+              }
           }}
           className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
         >
@@ -744,41 +1017,85 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             <span className="text-xs text-stone-400 font-bold uppercase">步骤 2/4</span>
             <div className="w-6"></div>
         </div>
-        
+
         <h3 className="text-2xl font-serif font-bold text-emerald-900 mb-2 flex items-center gap-2">
            <Ear className="text-emerald-600"/> 闻诊 · 听声息
         </h3>
-        <p className="text-stone-500 mb-8 text-sm">中医闻诊包括听声音和嗅气味。请描述您的声音变化（如嘶哑、低弱）、咳嗽声音特点，以及是否有特殊的口气或体味。</p>
+        <p className="text-stone-500 mb-8 text-sm">
+            请录制一段约 <strong>10-15秒</strong> 的音频，内容包括：<br/>
+            1. 自然朗读一段文字（如“你好，我是...”），以分析语调与语速。<br/>
+            2. 用力咳嗽两声，以分析肺气状况。<br/>
+            3. 做几次深呼吸，以分析气息强弱。
+        </p>
+
+        {/* Audio Recording Section */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-6">
+            <label className="block font-bold text-stone-700 mb-3 flex justify-between">
+                <span>录音采集 (用以Healon分析)</span>
+                {audioBase64 && <span className="text-emerald-600 text-xs flex items-center gap-1"><Check size={12}/> 已录制</span>}
+            </label>
+            <div className="flex flex-col items-center justify-center p-8 bg-stone-50 rounded-xl border-2 border-dashed border-stone-300">
+                <button
+                    onClick={toggleRecording}
+                    className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)] scale-110' : (audioBase64 ? 'bg-emerald-500' : 'bg-stone-800')}`}
+                >
+                    {isRecording ? <div className="w-8 h-8 bg-white rounded"></div> : <Mic size={32} className="text-white"/>}
+                </button>
+                <p className="mt-4 text-sm text-stone-500 font-medium">
+                    {isRecording ? '正在录音... 点击停止' : (audioBase64 ? '录音完成，可点击重录' : '点击开始录音')}
+                </p>
+            </div>
+        </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
-           <label className="block font-bold text-stone-700 mb-3">语音/气息描述</label>
+           <label className="block font-bold text-stone-700 mb-3">补充描述 (主观感受与气味)</label>
            <div className="relative">
-             <textarea 
+             <textarea
                 value={wenAudioText}
                 onChange={e => setWenAudioText(e.target.value)}
-                placeholder="例如：最近说话声音比较小，感觉气短。咳嗽声音很重，有痰鸣声。早起口苦口臭..."
-                className="w-full p-4 pb-12 bg-stone-50 border border-stone-300 rounded-xl min-h-[200px] focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder={'请补充【闻诊】中无法通过录音获取的信息，例如：\n1. 口气或体味（如口臭、腥臭味）\n2. 痰液的性状与气味\n3. 主观感觉（如胸闷、心悸）'}
+                className="w-full p-4 pb-12 bg-stone-50 border border-stone-300 rounded-xl min-h-[120px] focus:ring-2 focus:ring-emerald-500 outline-none"
              />
-             <button 
-               onClick={toggleListening}
+             <button
+               onClick={toggleSpeechToText}
                className={`absolute bottom-4 right-4 p-2 rounded-full transition-all ${isListening ? 'bg-red-500 animate-pulse text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-               title="语音输入"
+               title="语音转文字"
              >
-               {isListening ? <MicOff size={20}/> : <Mic size={20}/>}
+               {isListening ? <MicOff size={20}/> : <MessageSquare size={20}/>}
              </button>
            </div>
-           {isListening && <p className="text-xs text-red-500 mt-2">正在聆听... (请大声说话)</p>}
         </div>
 
         <div className="mt-8 flex justify-end gap-4">
-          <button 
+          <button
             onClick={goBack}
             className="px-6 py-3 rounded-full font-bold text-stone-500 hover:bg-stone-200 transition-all"
           >
             上一步
           </button>
-          <button 
-            onClick={() => changeStep(DiagnosisStep.WEN_INQUIRY)}
+          <button
+            onClick={() => {
+                changeStep(DiagnosisStep.WEN_INQUIRY);
+
+                // Trigger background Wen Analysis
+                if (audioBase64) {
+                    if (stepStatus.wen === 'idle' || stepStatus.wen === 'error') {
+                        setStepStatus(prev => ({ ...prev, wen: 'loading' }));
+                        analyzeAudioWithQwenOmni(audioBase64, wenAudioText)
+                            .then(res => {
+                                setWenResult(res.content);
+                                setStepStatus(prev => ({ ...prev, wen: 'success' }));
+                            })
+                            .catch(e => {
+                                console.error("Wen Analysis Failed", e);
+                                setStepStatus(prev => ({ ...prev, wen: 'error' }));
+                            });
+                    }
+                } else {
+                    setWenResult('用户未录制音频，仅提供了文字描述。');
+                    setStepStatus(prev => ({ ...prev, wen: 'success' }));
+                }
+            }}
             className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all flex items-center gap-2"
           >
             下一步 <ChevronRight size={18} />
@@ -817,7 +1134,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
            ].map((item) => (
              <div key={item.id} className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
                 <label className="block text-sm font-bold text-emerald-800 mb-1">{item.label}</label>
-                <input 
+                <input
                   value={(inquiryData as any)[item.id]}
                   onChange={e => setInquiryData({...inquiryData, [item.id]: e.target.value})}
                   placeholder={item.placeholder}
@@ -828,13 +1145,13 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         </div>
 
         <div className="mt-8 flex justify-end pb-8 gap-4">
-          <button 
+          <button
             onClick={goBack}
             className="px-6 py-3 rounded-full font-bold text-stone-500 hover:bg-stone-200 transition-all"
           >
             上一步
           </button>
-          <button 
+          <button
             onClick={() => changeStep(DiagnosisStep.QIE)}
             className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all flex items-center gap-2"
           >
@@ -846,89 +1163,43 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderQie = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-5 md:p-8 bg-stone-950 text-white text-center h-full overflow-y-auto">
-      <div className="w-full max-w-3xl flex items-center justify-between mb-6">
-        <button onClick={goBack} className="motion-press text-stone-400 hover:text-white p-2 bg-stone-900 border border-stone-800 rounded-full">
+    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-stone-900 text-white text-center h-full">
+      <div className="w-full max-w-2xl flex items-center justify-between mb-8">
+        <button onClick={goBack} className="text-stone-400 hover:text-white p-2 bg-stone-800 rounded-full">
             <ChevronLeft size={20}/>
         </button>
         <span className="text-xs text-stone-500 font-bold uppercase">步骤 4/4</span>
         <div className="w-10"></div>
       </div>
 
-      <div className="motion-scale-in w-full max-w-3xl bg-stone-900/80 border border-stone-800 rounded-3xl p-5 md:p-7 shadow-2xl shadow-black/30">
-        <div className="flex flex-col md:flex-row md:items-start gap-6 text-left">
-          <div className="md:w-[280px] rounded-2xl border border-stone-700 bg-black/20 p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${pulseDemoConnected ? 'bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.7)]' : 'bg-amber-400'}`} />
-                <span className="text-sm font-bold">{pulseDemoConnected ? '演示设备已连接' : '待连接设备'}</span>
-              </div>
-              <HeartPulse className={pulseDemoConnected ? 'text-emerald-300' : 'text-stone-500'} size={22} />
-            </div>
-
-            <div className="h-28 rounded-2xl bg-stone-950 border border-stone-800 flex items-center justify-center gap-2 px-5 overflow-hidden">
-              {[28, 48, 76, 40, 66, 34, 88, 42, 62, 30].map((height, index) => (
-                <span
-                  key={index}
-                  className={`w-2 rounded-full ${pulseDemoConnected ? 'bg-emerald-400 pulse-line' : 'bg-stone-700'}`}
-                  style={{ height: `${height}%`, animationDelay: `${index * 80}ms` }}
-                />
-              ))}
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl bg-stone-800/80 p-3">
-                <span className="block text-stone-500 mb-1">设备</span>
-                <strong className="text-stone-200">{pulseDemoConnected ? 'DEMO-01' : '未接入'}</strong>
-              </div>
-              <div className="rounded-xl bg-stone-800/80 p-3">
-                <span className="block text-stone-500 mb-1">脉率</span>
-                <strong className="text-stone-200">{pulseDemoConnected ? '78 次/分' : '--'}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1">
-            <div className="mb-5">
-              <h2 className="text-2xl font-serif font-bold mb-2">切诊 · 脉象采集</h2>
-              <p className="text-stone-400 text-sm leading-6">
-                当前流程预留脉诊设备接入位。真实设备未连接时，可手动填写既往脉诊记录；演示模式会模拟设备已连接并直接进入报告生成。
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-stone-700 bg-stone-800/40 p-4 mb-4">
-              <p className="text-stone-300 text-sm leading-relaxed flex items-start gap-2">
-                <Info className="flex-shrink-0 text-emerald-400 mt-0.5" size={16}/>
-                <span>中医脉诊需要结合“位、数、形、势”等信息，本模块用于健康管理演示和辅助记录。</span>
-              </p>
-              <textarea
-                value={qieData}
-                onChange={e => {
-                  setQieData(e.target.value);
-                  setPulseDemoConnected(false);
-                }}
-                placeholder="例如：脉细数，按之无力；或使用演示连接自动写入模拟脉象。"
-                className="w-full mt-4 min-h-28 p-3 bg-black/30 border border-stone-600 rounded-xl text-white placeholder-stone-600 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-900/30 outline-none resize-none transition-all"
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={connectDemoPulseAndAnalyze}
-                className="motion-press flex-1 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-2"
-              >
-                <HeartPulse size={19}/> 演示连接并跳过
-              </button>
-              <button
-                onClick={() => startAnalysis()}
-                className="motion-press flex-1 px-5 py-3 rounded-2xl bg-white text-emerald-950 hover:bg-emerald-50 font-bold shadow-lg flex items-center justify-center gap-2"
-              >
-                <Zap size={19} className="fill-current"/> 生成四诊合参报告
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="mb-6 p-6 bg-stone-800 rounded-full">
+        <Activity size={64} className="text-stone-500" />
       </div>
+      <h2 className="text-2xl font-serif font-bold mb-4">切诊 · 脉象</h2>
+      <div className="bg-stone-800/50 p-6 rounded-2xl max-w-md mb-8 border border-stone-700">
+        <p className="text-stone-300 text-sm leading-relaxed mb-4 flex items-start gap-2 text-left">
+          <Info className="flex-shrink-0 text-emerald-500 mt-0.5" size={16}/>
+          <span>
+            中医脉诊需要医者指端触觉感知脉搏的“位、数、形、势”。由于线上诊疗的物理限制，目前无法进行真实的切诊。
+          </span>
+        </p>
+        <p className="text-stone-400 text-sm text-left">
+          如果您之前有过医生的脉诊记录（如：脉浮紧、脉细数），请在下方填写，这将有助于大模型更精准的判断。
+        </p>
+        <input
+          value={qieData}
+          onChange={e => setQieData(e.target.value)}
+          placeholder="例如：脉细数，按之无力 (选填)"
+          className="w-full mt-4 p-3 bg-black/30 border border-stone-600 rounded-lg text-white placeholder-stone-600 focus:border-emerald-500 outline-none"
+        />
+      </div>
+
+      <button
+        onClick={triggerAnalysis}
+        className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all flex items-center gap-2"
+      >
+        <Zap size={20} className="fill-current"/> 生成四诊合参报告
+      </button>
     </div>
   );
 
@@ -940,33 +1211,33 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 <ChevronLeft size={20} className="text-stone-400"/>
             </button>
             <h2 className="text-xl font-serif font-bold text-emerald-400 flex items-center gap-2">
-            <FileText /> 四诊合参报告
+            <FileText /> 诊断报告
             </h2>
         </div>
         <button onClick={() => changeStep(DiagnosisStep.INTRO)} className="text-sm text-stone-400 hover:text-white flex items-center gap-1 transition-colors">
            <RefreshCw size={14}/> 返回首页
         </button>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
          {step === DiagnosisStep.ANALYSIS ? (
            <div className="flex flex-col h-full max-w-3xl mx-auto space-y-6 pt-10">
-             
+
              {error ? (
                 // Error State UI
                 <div className="flex flex-col items-center justify-center bg-red-900/20 border border-red-500/50 p-8 rounded-2xl animate-fade-in max-w-md mx-auto mt-10">
                    <AlertTriangle size={48} className="text-red-500 mb-4" />
-                   <h3 className="text-xl font-bold text-red-400 mb-2">分析中断</h3>
+                   <h3 className="text-xl font-bold text-red-400 mb-2">诊断分析中断</h3>
                    <p className="text-stone-300 text-center mb-6">{error}</p>
                    <div className="flex gap-4">
-                     <button 
+                     <button
                         onClick={() => changeStep(DiagnosisStep.QIE)}
                         className="px-6 py-2 bg-stone-800 hover:bg-stone-700 rounded-full text-white transition-colors"
                      >
                        返回上一步
                      </button>
-                     <button 
-                        onClick={() => startAnalysis()}
+                     <button
+                        onClick={triggerAnalysis}
                         className="px-6 py-2 bg-red-600 hover:bg-red-500 rounded-full text-white font-bold flex items-center gap-2 transition-colors"
                      >
                        <RotateCcw size={16}/> 重试
@@ -976,24 +1247,58 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
              ) : (
                 // Loading / Streaming State
                 <>
-                <div className="flex flex-col items-center justify-center space-y-6 mb-8">
-                    <div className="relative">
-                    <div className="w-16 h-16 border-4 border-emerald-900 rounded-full"></div>
-                    <div className="w-16 h-16 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
-                    </div>
-                    <div className="text-center">
-                    <p className="text-xl font-bold text-emerald-100 mb-2">正在进行多模态辨证...</p>
-                    <p className="text-sm text-stone-500">大模型正在分析您的面色、舌象与问诊数据</p>
+                {/* Flowchart Visualization */}
+                <div className="w-full max-w-2xl mx-auto mb-8">
+                    <div className="relative z-0 flex justify-between items-center">
+                        {/* Progress Bar Background */}
+                        <div className="absolute top-1/2 left-0 w-full h-1 bg-stone-800 -z-10 -translate-y-1/2 rounded-full"></div>
+                        {/* Active Progress Bar */}
+                        <div
+                            className="absolute top-1/2 left-0 h-1 bg-emerald-500 -z-10 -translate-y-1/2 rounded-full transition-all duration-1000 ease-out"
+                            style={{ width: `${analysisProgress}%` }}
+                        ></div>
+
+                        {/* Step 1: Connect */}
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${analysisProgress >= 25 ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : 'bg-stone-900 border-stone-700 text-stone-600'}`}>
+                                <Zap size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${analysisProgress >= 25 ? 'text-emerald-400' : 'text-stone-600'}`}>服务连接</span>
+                        </div>
+
+                        {/* Step 2: Wang (Vision) */}
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wang === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <ScanEye size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${stepStatus.wang === 'success' ? 'text-emerald-400' : 'text-stone-600'}`}>望诊分析</span>
+                        </div>
+
+                        {/* Step 3: Wen (Audio) */}
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${stepStatus.wen === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wen === 'loading' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <Ear size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${stepStatus.wen === 'success' ? 'text-emerald-400' : 'text-stone-600'}`}>闻诊分析</span>
+                        </div>
+
+                        {/* Step 4: Summary */}
+                        <div className="flex flex-col items-center gap-2 relative z-10 bg-transparent rounded-full">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${realtimeContent ? 'bg-emerald-900 border-emerald-500 text-emerald-400' : (stepStatus.wang === 'success' && stepStatus.wen === 'success' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200 animate-pulse' : 'bg-stone-900 border-stone-700 text-stone-600')}`}>
+                                <Activity size={18} />
+                            </div>
+                            <span className={`text-xs font-bold transition-colors ${realtimeContent ? 'text-emerald-400' : 'text-stone-600'}`}>辨证汇总</span>
+                        </div>
                     </div>
                 </div>
-                
+
                 <div className="flex-1 bg-stone-900/80 rounded-xl border border-stone-800 p-6 overflow-hidden flex flex-col shadow-inner">
                     <div className="flex items-center gap-2 text-emerald-500 mb-4 border-b border-stone-800 pb-2">
-                    <Sparkles size={16} className={realtimeReasoning ? "animate-pulse" : ""}/> 
+                    <Sparkles size={16} className={realtimeReasoning ? "animate-pulse" : ""}/>
                     <span className="text-sm font-bold uppercase tracking-wider">
-                        {realtimeReasoning ? "模型推演过程" : (
-                            realtimeContent ? "正在生成健康报告..." :
-                            (isConnected ? "已连接，大模型思考中..." : "连接云端计算中...")
+                        {realtimeReasoning ? "Healon 思考过程" : (
+                            realtimeContent ? "正在生成诊断报告..." :
+                            (isConnected ? "已连接，Healon 思考中..." : "连接云端计算中...")
                         )}
                     </span>
                     </div>
@@ -1012,7 +1317,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                             <Loader2 size={14} className="animate-spin"/>
                             {realtimeContent
                                 ? "深度推理完成，正在输出详细报告..."
-                                : (isConnected ? "大模型正在分析图像特征..." : "正在建立安全连接 (压缩上传中)...")}
+                                : (isConnected ? "Healon 正在分析特征..." : "正在建立安全连接 (压缩上传中)...")}
                         </p>
                         </div>
                     )}
@@ -1134,7 +1439,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   return (
-    <div className="flex-1 relative overflow-hidden bg-stone-950 h-full w-full min-h-0">
+    <div className="flex-1 relative overflow-hidden bg-stone-950 h-full">
       <SlideTransition position={getSlidePosition(DiagnosisStep.INTRO)}>
         {renderIntro()}
       </SlideTransition>

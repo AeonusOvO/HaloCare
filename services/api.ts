@@ -36,9 +36,9 @@ export const api = {
   async createFamily(token, name) {
     const res = await fetch(`${API_BASE}/family/create`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ name })
     });
@@ -57,9 +57,9 @@ export const api = {
   async inviteMember(token, username) {
     const res = await fetch(`${API_BASE}/family/invite`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ username })
     });
@@ -78,9 +78,9 @@ export const api = {
   async respondToInvite(token, notificationId, accept) {
     const res = await fetch(`${API_BASE}/user/notifications/${notificationId}/respond`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ accept })
     });
@@ -91,9 +91,9 @@ export const api = {
   async setRole(token, targetUserId, role) {
     const res = await fetch(`${API_BASE}/family/role`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ targetUserId, role })
     });
@@ -123,12 +123,20 @@ export const api = {
     return res.json();
   },
 
+  async getDiagnosisDetail(token, id) {
+    const res = await fetch(`${API_BASE}/diagnosis/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
   async saveDiagnosis(token, diagnosis) {
     const res = await fetch(`${API_BASE}/diagnosis`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(diagnosis)
     });
@@ -140,6 +148,115 @@ export const api = {
     const res = await fetch(`${API_BASE}/diagnosis/${id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  // Async Diagnosis Tasks
+  async startDiagnosisTask(token, inputData) {
+    const res = await fetch(`${API_BASE}/diagnosis/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(inputData)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getActiveTask(token) {
+    const res = await fetch(`${API_BASE}/diagnosis/active`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async getTaskStatus(token, taskId) {
+    const res = await fetch(`${API_BASE}/diagnosis/task/${taskId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  // Health Profiles (TCM Archives)
+  async getProfiles(token) {
+    const res = await fetch(`${API_BASE}/profiles`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async createProfile(token, profile) {
+    const res = await fetch(`${API_BASE}/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(profile)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async updateProfile(token, id, updates) {
+    const res = await fetch(`${API_BASE}/profiles/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async deleteProfile(token, id) {
+    const res = await fetch(`${API_BASE}/profiles/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  // Habits (Cloud Sync)
+  async getHabitModel(token) {
+    const res = await fetch(`${API_BASE}/habits`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async setHabitModel(token, model) {
+    const res = await fetch(`${API_BASE}/habits`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(model || {})
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+
+  async recordHabitEvent(token, payload) {
+    const res = await fetch(`${API_BASE}/habits/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
     });
     if (!res.ok) throw await res.json();
     return res.json();
