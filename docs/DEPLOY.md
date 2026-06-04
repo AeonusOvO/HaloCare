@@ -9,6 +9,7 @@
 - 项目目录：`/var/www/HaloCare`
 - 数据策略：全新部署，不迁移旧用户数据
 - 共存约束：不要删除或覆盖 `yicehui.art`、`/var/www/yicehui`、`/opt/yicehui`、`/opt/openclaw`、`openclaw-gateway.service`、`yicehui-docx.service`
+- Git 分支：只使用并部署 `master`，不要推送或交付 `codex/*`、`main` 等临时分支
 
 ## 1. DNS 与 SSH
 
@@ -51,7 +52,7 @@ pm2 -v
 
 ## 3. 上传源码
 
-推荐使用 GitHub Actions 自动部署：推送到 `master` 或手动触发 `.github/workflows/deploy.yml` 后，工作流会打包干净源码、上传到 `/tmp/halocare-release.tgz`，在服务器保留 `/var/www/HaloCare/storage` 和 `/var/www/HaloCare/server/.env` 后执行根目录 `deploy.sh`。
+推荐使用 GitHub Actions 自动部署：推送到 `master` 或手动触发 `.github/workflows/deploy.yml` 后，工作流会打包干净源码、上传到 `/tmp/halocare-release.tgz`，在服务器保留 `/var/www/HaloCare/storage` 和 `/var/www/HaloCare/server/.env` 后执行根目录 `deploy.sh`。工作流只监听 `master`，不得把生产发布放在 `codex/*` 或其他分支。
 
 仓库需要配置 Secrets：
 

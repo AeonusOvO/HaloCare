@@ -45,11 +45,12 @@
 
 ## 发布与同步要求
 
-1. 每次完成代码或文档修改并通过必要验证后，必须将本次变更提交并推送到 GitHub，然后按部署文档同步到服务器。
-2. 推送和服务器同步应在交付前完成；如果因权限、网络、密钥、远端冲突、未明确提交范围或工作区存在无关变更而无法完成，交付说明必须明确写出原因、当前阻塞点和建议的下一步命令。
-3. 推送前必须避免把 API Key、JWT Secret、`.env`、`.pem` 私钥或真实用户数据纳入提交；如工作区中存在此类文件，只能在明确确认其安全性和提交范围后处理。
-4. 服务器同步必须遵循 `docs/DEPLOY.md`、`docs/SERVER_MANUAL.md` 和 `docs/NGINX_CONFIG.md`，不得临时发明部署流程。
-5. 本地除构建、测试、语法检查、浏览器验证或必要排错外，不得启动开发服务、预览服务或后端服务；验证结束后必须停止本地服务，不能让本地进程常驻运行。
+1. 本项目唯一交付和部署分支为 `master`。除非用户明确要求，不得创建、推送或交付 `codex/*`、`main` 或其他临时分支；如果工作误在 `codex/*` 分支上完成，必须先把有效变更合并或 cherry-pick 到 `master`，再推送 `origin/master`。
+2. 每次完成代码或文档修改并通过必要验证后，必须将本次变更提交并推送到 GitHub 的 `master`，然后按部署文档同步到服务器。
+3. 推送和服务器同步应在交付前完成；如果因权限、网络、密钥、远端冲突、未明确提交范围或工作区存在无关变更而无法完成，交付说明必须明确写出原因、当前阻塞点和建议的下一步命令。
+4. 推送前必须避免把 API Key、JWT Secret、`.env`、`.pem` 私钥或真实用户数据纳入提交；如工作区中存在此类文件，只能在明确确认其安全性和提交范围后处理。
+5. 服务器同步必须遵循 `docs/DEPLOY.md`、`docs/SERVER_MANUAL.md` 和 `docs/NGINX_CONFIG.md`，不得临时发明部署流程。
+6. 本地除构建、测试、语法检查、浏览器验证或必要排错外，不得启动开发服务、预览服务或后端服务；验证结束后必须停止本地服务，不能让本地进程常驻运行。
 
 ## 生产服务器与自动部署
 
@@ -58,7 +59,7 @@
 3. 同一台服务器已有艺策汇和龙虾系统，部署云脉珍心时不得破坏：艺策汇目录 `/var/www/yicehui`、`/opt/yicehui`，服务 `yicehui-docx.service`，域名 `yicehui.art`；龙虾目录 `/opt/openclaw`，服务 `openclaw-gateway.service`，本地端口 `127.0.0.1:18789`。除只读健康检查外，不得修改、删除、重启或覆盖这些系统的目录、服务和 Nginx 配置。
 4. 云脉珍心部署只允许操作 `/var/www/HaloCare`、PM2 进程 `halocare-backend`、Nginx 配置 `halocare` 及其证书相关配置；如需重载共享 Nginx，必须先执行 `sudo nginx -t` 且不得改动其他站点配置。
 5. 生产数据 `storage/` 和服务器端 `server/.env` 必须保留，不得被打包覆盖、提交到 GitHub 或写入文档。同步代码时应排除 `.env`、`.pem`、`storage/`、`node_modules/`、`dist/` 等本地/生产状态文件。
-6. 自动部署由 `.github/workflows/deploy.yml` 和根目录 `deploy.sh` 共同承担：GitHub Actions 负责打包干净源码并上传到服务器，服务器端保留生产 `storage/` 与 `server/.env` 后执行 `deploy.sh` 构建、安装依赖并通过 PM2 重载后端。
+6. 自动部署由 `.github/workflows/deploy.yml` 和根目录 `deploy.sh` 共同承担，且只监听 `master` 分支：GitHub Actions 负责打包干净源码并上传到服务器，服务器端保留生产 `storage/` 与 `server/.env` 后执行 `deploy.sh` 构建、安装依赖并通过 PM2 重载后端。
 7. GitHub Actions 需要配置仓库 Secrets：`SERVER_HOST=43.163.215.149`、`SERVER_USER=ubuntu`、`SERVER_SSH_KEY` 为 `Hongkong_ssh.pem` 对应私钥内容，可选 `SERVER_PORT=22`；不得把私钥明文写进仓库。
 8. 每次部署后至少验证：`https://www.yunmai.life` 返回 200，`https://www.yunmai.life/api/test` 返回成功，`pm2 status halocare-backend` 正常，`nginx.service` 正常；同时只读确认 `https://yicehui.art`、`yicehui-docx.service`、`openclaw-gateway.service` 仍正常。
 

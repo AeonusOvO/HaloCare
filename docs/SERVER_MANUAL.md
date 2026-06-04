@@ -32,6 +32,8 @@
 - 艺策汇：`yicehui.art`、`/var/www/yicehui`、`/opt/yicehui`、`yicehui-docx.service`
 - OpenClaw/龙虾：`/opt/openclaw`、`openclaw-gateway.service`、本机端口 `18789`
 
+发布只使用 `master` 分支。不得把生产变更推送或停留在 `codex/*`、`main` 等临时分支；如误用临时分支，先把有效变更合并或 cherry-pick 到 `master`，再推送并部署。
+
 ## 3. 服务端口
 
 - `22`：SSH
@@ -41,7 +43,7 @@
 
 ## 4. 日常部署
 
-优先使用 GitHub Actions 自动部署：推送 `master` 或手动触发 `.github/workflows/deploy.yml`，工作流会上传干净源码包并在服务器执行 `/var/www/HaloCare/deploy.sh`。仓库 Secrets 需配置 `SERVER_HOST`、`SERVER_USER`、`SERVER_SSH_KEY`，可选 `SERVER_PORT`。
+优先使用 GitHub Actions 自动部署：推送 `master` 或手动触发 `.github/workflows/deploy.yml`，工作流会上传干净源码包并在服务器执行 `/var/www/HaloCare/deploy.sh`。工作流只监听 `master`，仓库 Secrets 需配置 `SERVER_HOST`、`SERVER_USER`、`SERVER_SSH_KEY`，可选 `SERVER_PORT`。
 
 手动兜底部署时，本地提交后用 Git 生成干净源码归档，再上传服务器：
 
