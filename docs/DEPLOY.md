@@ -62,10 +62,10 @@ pm2 -v
 
 不得把 `.pem`、`.env`、`storage/` 或真实用户数据提交到 GitHub。
 
-如需手动兜底部署，从本地打包时排除旧数据、密钥、IDE 状态和依赖目录：
+如需手动兜底部署，从本地已提交的 Git 源码生成干净归档，避免把本地依赖、构建产物、密钥、IDE 状态或生产数据打进去：
 
 ```powershell
-tar --exclude=.git --exclude=node_modules --exclude=server/node_modules --exclude=dist --exclude=storage --exclude=server/.env --exclude=*.pem --exclude=android/.idea -czf halocare-release.tgz .
+git archive --format=tar.gz -o halocare-release.tgz HEAD
 scp -i Hongkong_ssh.pem halocare-release.tgz ubuntu@43.163.215.149:/tmp/
 ```
 

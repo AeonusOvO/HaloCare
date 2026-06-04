@@ -43,10 +43,10 @@
 
 优先使用 GitHub Actions 自动部署：推送 `master` 或手动触发 `.github/workflows/deploy.yml`，工作流会上传干净源码包并在服务器执行 `/var/www/HaloCare/deploy.sh`。仓库 Secrets 需配置 `SERVER_HOST`、`SERVER_USER`、`SERVER_SSH_KEY`，可选 `SERVER_PORT`。
 
-手动兜底部署时，本地更新源码后重新打包上传，必须排除密钥、环境变量、依赖和生产数据：
+手动兜底部署时，本地提交后用 Git 生成干净源码归档，再上传服务器：
 
 ```powershell
-tar --exclude=.git --exclude=node_modules --exclude=server/node_modules --exclude=dist --exclude=storage --exclude=server/.env --exclude=*.pem --exclude=android/.idea -czf halocare-release.tgz .
+git archive --format=tar.gz -o halocare-release.tgz HEAD
 scp -i Hongkong_ssh.pem halocare-release.tgz ubuntu@43.163.215.149:/tmp/
 ```
 
