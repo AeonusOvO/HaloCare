@@ -4,20 +4,112 @@ on:
   push:
     branches:
       - master
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: halocare-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            cd /var/www/HaloCare
-            # 赋予脚本执行权限（如果尚未拥有）
-            chmod +x deploy.sh
-            # 执行部署脚本
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build clean release archive
+        run: |
+          mkdir -p release
+          tar \
+            --exclude='.git' \
+            --exclude='release' \
+            --exclude='node_modules' \
+            --exclude='server/node_modules' \
+            --exclude='dist' \
+            --exclude='storage' \
+            --exclude='server/storage' \
+            --exclude='server/.env' \
+            --exclude='.env' \
+            --exclude='*.pem' \
+            --exclude='*.key' \
+            -czf release/halocare-release.tgz .
+
+      - name: Configure SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          SERVER_HOST="${SERVER_HOST:-43.163.215.149}"
+          : "${SERVER_SSH_KEY:?Missing SERVER_SSH_KEY repository secret}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/halocare_deploy_key
+          chmod 600 ~/.ssh/halocare_deploy_key
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload and deploy
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          APP_DIR: ${{ vars.APP_DIR }}
+        run: |
+          SERVER_HOST="${SERVER_HOST:-43.163.215.149}"
+          SERVER_USER="${SERVER_USER:-ubuntu}"
+          SERVER_PORT="${SERVER_PORT:-22}"
+          APP_DIR="${APP_DIR:-/var/www/HaloCare}"
+
+          scp -i ~/.ssh/halocare_deploy_key -P "$SERVER_PORT" release/halocare-release.tgz "$SERVER_USER@$SERVER_HOST:/tmp/halocare-release.tgz"
+
+          ssh -i ~/.ssh/halocare_deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "APP_DIR='$APP_DIR' bash -s" <<'REMOTE'
+            set -Eeuo pipefail
+
+            APP_DIR="${APP_DIR:-/var/www/HaloCare}"
+            if [ "$APP_DIR" != "/var/www/HaloCare" ]; then
+              echo "Refusing to deploy outside /var/www/HaloCare: $APP_DIR" >&2
+              exit 1
+            fi
+
+            release_dir="$(mktemp -d /tmp/halocare-release.XXXXXX)"
+            tar -xzf /tmp/halocare-release.tgz -C "$release_dir"
+
+            sudo mkdir -p "$APP_DIR"
+            if [ -d "$APP_DIR/storage" ]; then
+              mkdir -p "$release_dir/storage"
+              sudo rsync -a "$APP_DIR/storage/" "$release_dir/storage/"
+            fi
+            if [ -f "$APP_DIR/server/.env" ]; then
+              mkdir -p "$release_dir/server"
+              sudo cp "$APP_DIR/server/.env" "$release_dir/server/.env"
+            else
+              echo "Missing $APP_DIR/server/.env; create production env before deploying." >&2
+              rm -rf "$release_dir"
+              exit 1
+            fi
+
+            sudo rsync -a --delete \
+              --exclude='.git/' \
+              --exclude='node_modules/' \
+              --exclude='server/node_modules/' \
+              --exclude='storage/' \
+              --exclude='server/.env' \
+              "$release_dir/" "$APP_DIR/"
+
+            sudo chown -R "$(id -un):$(id -gn)" "$APP_DIR"
+            chmod +x "$APP_DIR/deploy.sh"
+            cd "$APP_DIR"
             ./deploy.sh
+
+            sudo nginx -t
+            sudo systemctl reload nginx
+            curl -fsS http://127.0.0.1:4000/api/test >/dev/null
+            curl -fsS https://www.yunmai.life/api/test >/dev/null
+            if systemctl list-unit-files | grep -q '^yicehui-docx.service'; then
+              systemctl is-active --quiet yicehui-docx.service
+            fi
+            if systemctl list-unit-files | grep -q '^openclaw-gateway.service'; then
+              systemctl is-active --quiet openclaw-gateway.service
+            fi
+
+            rm -rf "$release_dir" /tmp/halocare-release.tgz
+          REMOTE

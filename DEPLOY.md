@@ -1,104 +1,164 @@
-# 部署指南 (Deployment Guide)
+# 新服务器部署指南
 
-你好！这是为您准备的服务器部署指南。
+目标服务器：
 
-## 1. 获取最新代码
-在您的服务器终端中，进入项目目录并拉取最新代码：
-```bash
-cd /path/to/your/project  # 进入您的项目文件夹
-git pull origin master    # 拉取最新的代码
+- 公网 IP：`43.163.215.149`
+- 内网 IP：待服务器侧确认
+- 域名：`www.yunmai.life`、`yunmai.life`
+- SSH：`ssh -i Hongkong_ssh.pem ubuntu@43.163.215.149`
+- 项目目录：`/var/www/HaloCare`
+- 数据策略：全新部署，不迁移旧用户数据
+- 共存约束：不要删除或覆盖 `yicehui.art`、`/var/www/yicehui`、`/opt/yicehui`、`/opt/openclaw`、`openclaw-gateway.service`、`yicehui-docx.service`
+
+## 1. DNS 与 SSH
+
+部署前确认域名 A 记录已经指向公网 IP：
+
+```powershell
+Resolve-DnsName www.yunmai.life -Type A
+Resolve-DnsName yunmai.life -Type A
 ```
 
-## 2. 安装依赖
-如果是第一次部署或 `package.json` 有变动，需要安装依赖。
+Windows 上如果 SSH 提示私钥权限过宽，收紧根目录密钥权限：
 
-**安装前端依赖：**
-```bash
-# 在项目根目录
-npm install
+```powershell
+$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+icacls .\Hongkong_ssh.pem /inheritance:r
+icacls .\Hongkong_ssh.pem /remove:g "Authenticated Users" "BUILTIN\Users" "Everyone"
+icacls .\Hongkong_ssh.pem /grant:r "${user}:R"
 ```
 
-**安装后端依赖：**
+## 2. 安装服务器基础环境
+
+在服务器执行：
+
 ```bash
-cd server
-npm install
-cd ..  # 返回根目录
+sudo apt update
+sudo apt install -y curl ca-certificates nginx certbot python3-certbot-nginx
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install -g pm2
 ```
 
-## 3. 启动服务 (推荐方式)
+验证：
 
-为了让服务在后台持续运行（即使您关闭了终端），强烈推荐使用 `pm2` 工具。
-
-### 安装 PM2 (如果还没安装)
 ```bash
-npm install -g pm2
+node -v
+npm -v
+nginx -v
+pm2 -v
 ```
 
-### 启动后端 (Backend)
-```bash
-# 进入 server 目录
-cd server
+## 3. 上传源码
 
-# 使用 pm2 启动 (起个名字叫 backend)
-pm2 start index.js --name "halocare-backend"
+从本地打包时排除旧数据和依赖目录：
 
-# 确认后端正常运行
-pm2 logs halocare-backend
-# 如果看到 "Backend server running on http://localhost:4000" 说明成功
-# 按 Ctrl + C 退出日志查看 (服务仍在运行)
-
-cd .. # 返回根目录
+```powershell
+tar --exclude=.git --exclude=node_modules --exclude=server/node_modules --exclude=dist --exclude=storage -czf halocare-release.tgz .
+scp -i Hongkong_ssh.pem halocare-release.tgz ubuntu@43.163.215.149:/tmp/
 ```
 
-### 启动前端 (Frontend)
+服务器解包：
 
-**方式 A：开发模式 (最简单，适合测试)**
 ```bash
-# 直接在 3000 端口启动
-pm2 start "npm run dev -- --host" --name "halocare-frontend"
+sudo mkdir -p /var/www/HaloCare
+sudo chown -R ubuntu:ubuntu /var/www/HaloCare
+tar -xzf /tmp/halocare-release.tgz -C /var/www/HaloCare
+chmod +x /var/www/HaloCare/deploy.sh
 ```
-*注意：开发模式性能较差，且非 HTTPS 环境下手机可能无法调用摄像头。*
 
-**方式 B：生产模式 (最佳实践)**
-1. 构建静态文件：
-   ```bash
-   npm run build
-   ```
-   这会在项目根目录下生成一个 `dist` 文件夹。
+## 4. 配置后端环境变量
 
-2. 使用静态服务运行：
-   ```bash
-   # 安装简单的静态服务器 serve
-   npm install -g serve
-   
-   # 启动 dist 目录 (端口 3000)
-   pm2 start "serve -s dist -l 3000" --name "halocare-frontend"
-   ```
+创建 `/var/www/HaloCare/server/.env`：
 
-## 4. 常用维护指令
+```bash
+cat > /var/www/HaloCare/server/.env <<'EOF'
+DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxx
+PORT=4000
+HOST=127.0.0.1
+JWT_SECRET=replace_with_a_long_random_secret
+CREATE_DEFAULT_ROOT_USER=false
+EOF
+```
 
-- **查看所有服务状态**：
-  ```bash
-  pm2 list
-  ```
+`DASHSCOPE_API_KEY` 是阿里云 DashScope 密钥，`JWT_SECRET` 使用随机长字符串。生产环境保持 `CREATE_DEFAULT_ROOT_USER=false`。
 
-- **重启服务** (代码更新后执行)：
-  ```bash
-  pm2 restart all
-  ```
+## 5. 构建并启动后端
 
-- **停止服务**：
-  ```bash
-  pm2 stop all
-  ```
+```bash
+cd /var/www/HaloCare
+./deploy.sh
+```
 
-## 关于摄像头权限 (重要)
-由于浏览器的安全限制，**手机端必须使用 HTTPS 协议才能调用摄像头**。
-如果您的服务器是 HTTP (例如 `http://1.2.3.4:3000`)，手机浏览器会拒绝访问摄像头。
+脚本会完成：
 
-**解决方法：**
-1. 购买域名并解析到您的服务器 IP。
-2. 使用 Nginx 配置反向代理，并申请免费的 SSL 证书 (Let's Encrypt)。
-3. 如果只是临时测试，部分安卓手机浏览器在 `chrome://flags` 中设置 `Insecure origins treated as secure` 可以绕过，但这比较麻烦。
+- 安装前端依赖
+- 构建 `dist/`
+- 安装后端依赖
+- 启动或重载 PM2 进程 `halocare-backend`
 
-建议：如果只是演示，可以使用电脑浏览器测试摄像头，或者确保手机使用的是 HTTPS 链接。
+检查：
+
+```bash
+pm2 list
+curl http://127.0.0.1:4000/api/test
+```
+
+## 6. 配置 Nginx 与 HTTPS
+
+先写入 HTTP 配置，确保 Certbot 可以完成域名校验：
+
+```bash
+sudo tee /etc/nginx/sites-available/halocare >/dev/null <<'EOF'
+server {
+    listen 80;
+    server_name www.yunmai.life yunmai.life;
+
+    root /var/www/HaloCare/dist;
+    index index.html;
+    client_max_body_size 50m;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        proxy_buffering off;
+    }
+}
+EOF
+
+sudo test -e /etc/nginx/sites-enabled/yicehui
+sudo ln -sf /etc/nginx/sites-available/halocare /etc/nginx/sites-enabled/halocare
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+签发证书：
+
+```bash
+sudo certbot --nginx -d www.yunmai.life -d yunmai.life --non-interactive --agree-tos --register-unsafely-without-email
+```
+
+然后用 [NGINX_CONFIG.md](NGINX_CONFIG.md) 中的最终 HTTPS 配置覆盖 Nginx 配置，并重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 7. 验证线上服务
+
+```bash
+curl -I https://www.yunmai.life
+curl https://www.yunmai.life/api/test
+```
+
+手机端必须使用 `https://www.yunmai.life` 访问，HTTP 和裸 IP 都无法稳定调用摄像头权限。

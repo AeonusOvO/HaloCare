@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { callQwen } from '../services/qwenService';
+import { callModel } from '../services/modelService';
 import { DoctorDiagnosis, Message } from '../types';
-import { Stethoscope, UserCheck, GitCompare, MessageSquare, Loader2, Sparkles } from 'lucide-react';
+import { Stethoscope, UserCheck, GitCompare, Loader2, Sparkles } from 'lucide-react';
 
 const SmartConsultation: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -27,17 +27,16 @@ const SmartConsultation: React.FC = () => {
       const promises = doctors.map(async (doc) => {
         const systemPrompt = `你扮演${doc.name}，头衔是${doc.title}。
         你的诊疗风格是：${doc.style}。
-        请根据用户的描述，给出诊断、处方思路和建议。
+        请根据用户的描述，给出辨证观点、处方思路或调理建议。
         必须保持人物设定，语气符合身份。
-        请输出JSON格式: { "diagnosis": "诊断结果", "prescription": "处方或调理建议", "thinking": "辨证思路" }`;
+        请输出JSON格式: { "diagnosis": "辨证意见", "prescription": "处方或调理建议", "thinking": "辨证思路" }`;
 
         const msgs: Message[] = [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: query }
         ];
 
-        // Use qwen-plus for faster multi-doctor simulation
-        const res = await callQwen(msgs, 'qwen-plus', 0.6);
+        const res = await callModel(msgs, 'qwen-plus', 0.6);
         let parsed;
         try {
              const clean = res.content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -66,7 +65,7 @@ const SmartConsultation: React.FC = () => {
       专家2 (${results[1].name}): ${results[1].diagnosis}, 建议: ${results[1].prescription}
       专家3 (${results[2].name}): ${results[2].diagnosis}, 建议: ${results[2].prescription}`;
 
-      const consensusRes = await callQwen([{ role: 'user', content: consensusPrompt }], 'qwen-plus');
+      const consensusRes = await callModel([{ role: 'user', content: consensusPrompt }], 'qwen-plus');
       setConsensus(consensusRes.content);
 
     } catch (e) {
@@ -79,12 +78,12 @@ const SmartConsultation: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6 pb-24 max-w-6xl mx-auto h-full overflow-y-auto">
-      <div className="text-center mb-8">
+      <div className="motion-enter text-center mb-8">
         <h2 className="text-3xl font-serif font-bold text-emerald-900 mb-2">名医云会诊</h2>
         <p className="text-stone-500">连接高校与三甲医院，多专家同步在线辨证</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 mb-8">
+      <div className="motion-enter motion-enter-delay-1 bg-white rounded-2xl shadow-sm border border-stone-200 p-4 mb-8">
         <label className="block text-sm font-bold text-stone-700 mb-2">主诉/病情描述</label>
         <textarea
           value={query}
@@ -96,7 +95,7 @@ const SmartConsultation: React.FC = () => {
           <button
             onClick={startConsultation}
             disabled={loading || !query}
-            className="bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all disabled:opacity-50 flex items-center gap-2"
+            className="motion-press bg-emerald-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-900 transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? <Loader2 className="animate-spin" /> : <Stethoscope />}
             发起会诊
@@ -105,7 +104,7 @@ const SmartConsultation: React.FC = () => {
       </div>
 
       {loading && (
-        <div className="text-center py-12">
+        <div className="motion-enter text-center py-12">
           <Loader2 className="animate-spin mx-auto text-emerald-600 mb-4" size={48} />
           <p className="text-stone-600 animate-pulse">正在同步连线三位专家进行辨证...</p>
           <div className="mt-4 flex justify-center gap-4 text-xs text-stone-400">
@@ -120,7 +119,7 @@ const SmartConsultation: React.FC = () => {
         <div className="space-y-8 animate-fade-in">
           <div className="grid md:grid-cols-3 gap-6">
             {diagnoses.map((doc) => (
-              <div key={doc.id} className="bg-white rounded-xl overflow-hidden shadow-md border border-stone-100 flex flex-col">
+              <div key={doc.id} className="motion-card bg-white rounded-xl overflow-hidden shadow-md border border-stone-100 flex flex-col">
                 <div className="bg-stone-50 p-4 border-b border-stone-100 flex items-center gap-3">
                   <img src={doc.avatar} alt={doc.name} className="w-12 h-12 rounded-full bg-white p-1 border" />
                   <div>
@@ -130,16 +129,16 @@ const SmartConsultation: React.FC = () => {
                 </div>
                 <div className="p-4 flex-1">
                   <div className="mb-4">
-                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">诊断结果</h4>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">辨证意见</h4>
                     <p className="font-serif font-bold text-lg text-emerald-900">{doc.diagnosis}</p>
                   </div>
                   <div className="mb-4">
-                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">治疗建议</h4>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">调理建议</h4>
                     <p className="text-sm text-stone-600 leading-relaxed">{doc.prescription}</p>
                   </div>
                   {doc.thinking && (
                      <div className="bg-stone-50 p-3 rounded-lg text-xs text-stone-500 italic border border-stone-100">
-                        <span className="flex items-center gap-1 font-bold not-italic mb-1"><Sparkles size={10}/> AI 思考回路:</span>
+                        <span className="flex items-center gap-1 font-bold not-italic mb-1"><Sparkles size={10}/> 模型推演摘要:</span>
                         {doc.thinking.slice(0, 100)}...
                      </div>
                   )}
@@ -161,6 +160,10 @@ const SmartConsultation: React.FC = () => {
                </div>
              </div>
           </div>
+
+          <p className="text-xs text-stone-500 leading-5 text-center">
+            本系统仅用于健康管理和科研演示，不作为临床诊断依据。
+          </p>
         </div>
       )}
     </div>

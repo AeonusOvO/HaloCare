@@ -1,79 +1,98 @@
 # Nginx 配置指南 (HTTPS + 反向代理)
 
-这是经过验证的，适用于 `halocare.life` 的最终配置。
+适用环境：
 
-## 核心问题复盘
-之前的配置之所以一直不生效，是因为 Nginx 存在“幽灵配置”问题：
-1. **配置文件脱钩**：`sites-enabled/default` 可能不再指向 `sites-available/default`，或者变成了一个独立文件。这导致无论怎么修改 `available` 下的文件，Nginx 读取的永远是旧文件。
-2. **转义字符错误**：使用 `cat` 写入文件时，`$` 符号被错误转义（如 `\$host`），导致 Nginx 无法解析变量。
+- 主域名：`www.yunmai.life`
+- 备用域名：`yunmai.life`
+- 项目目录：`/var/www/HaloCare`
+- 前端目录：`/var/www/HaloCare/dist`
+- 后端地址：`http://127.0.0.1:4000`
+- 配置文件：`/etc/nginx/sites-available/halocare`
+- 共存服务：保留 `/etc/nginx/sites-enabled/yicehui`，不要删除艺策汇配置
 
-**解决方案**：删除所有旧的 `default` 文件，新建专属的 `halocare` 配置文件并建立新的软链接。
+## 最终 HTTPS 配置
 
----
-
-## 1. 编译前端代码 (前提)
-```bash
-cd /var/www/HaloCare
-npm run build
-```
-
-## 2. 最终配置文件 (Standard)
-建议文件路径：`/etc/nginx/sites-available/halocare`
+证书签发后，使用以下配置覆盖 `/etc/nginx/sites-available/halocare`：
 
 ```nginx
 server {
     listen 80;
-    server_name halocare.life www.halocare.life;
-    return 301 https://$host$request_uri;
+    server_name www.yunmai.life yunmai.life;
+    return 301 https://www.yunmai.life$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name halocare.life www.halocare.life;
+    server_name yunmai.life;
 
-    # 证书路径
-    ssl_certificate /etc/letsencrypt/live/halocare.life/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/halocare.life/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/www.yunmai.life/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/www.yunmai.life/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-    # 安全参数
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    return 301 https://www.yunmai.life$request_uri;
+}
 
-    # 前端静态文件 (指向 dist 目录)
+server {
+    listen 443 ssl;
+    server_name www.yunmai.life;
+
+    ssl_certificate /etc/letsencrypt/live/www.yunmai.life/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/www.yunmai.life/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    root /var/www/HaloCare/dist;
+    index index.html;
+    client_max_body_size 50m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
     location / {
-        root /var/www/HaloCare/dist;
-        index index.html;
         try_files $uri $uri/ /index.html;
     }
 
-    # 后端接口反向代理
     location /api/ {
-        proxy_pass http://localhost:4000/api/;
+        proxy_pass http://127.0.0.1:4000/api/;
         proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+        proxy_buffering off;
     }
 }
 ```
 
-## 3. 启用配置 (关键步骤)
+## 启用配置
+
 ```bash
-# 1. 彻底清理旧配置
-sudo rm /etc/nginx/sites-enabled/default
-sudo rm /etc/nginx/sites-available/default
-
-# 2. 建立新链接
-sudo ln -s /etc/nginx/sites-available/halocare /etc/nginx/sites-enabled/
-
-# 3. 验证并重启
+sudo ln -sf /etc/nginx/sites-available/halocare /etc/nginx/sites-enabled/halocare
 sudo nginx -t
-sudo systemctl restart nginx
+sudo systemctl reload nginx
 ```
 
-## 4. 确保后端运行
+## 证书签发与续期
+
+首次签发：
+
 ```bash
-pm2 restart backend
+sudo certbot --nginx -d www.yunmai.life -d yunmai.life --non-interactive --agree-tos --register-unsafely-without-email
 ```
 
+检查自动续期：
+
+```bash
+sudo certbot renew --dry-run
+```
+
+## 移动端注意事项
+
+- 手机浏览器必须访问 `https://www.yunmai.life`，不要用 `http://` 或 IP 地址。
+- `client_max_body_size 50m` 用于支持手机拍照上传，否则 Nginx 默认 1 MB 容易返回 `413 Request Entity Too Large`。
+- `proxy_buffering off` 和较长超时用于支持 AI 流式响应。

@@ -11,6 +11,8 @@ const USERS_DIR = path.join(STORAGE_DIR, 'users');
 const FAMILIES_DIR = path.join(STORAGE_DIR, 'families');
 const USER_INDEX_FILE = path.join(STORAGE_DIR, 'user_index.json');
 
+const shouldCreateDefaultRootUser = process.env.CREATE_DEFAULT_ROOT_USER === 'true';
+
 // Ensure directories exist
 const init = async () => {
   await fs.ensureDir(STORAGE_DIR);
@@ -24,9 +26,9 @@ const init = async () => {
     await fs.writeJson(USER_INDEX_FILE, {});
   }
   
-  // Create default root user for dev/testing
+  // Create default root user only when explicitly enabled for local dev/testing.
   const index = await fs.readJson(USER_INDEX_FILE);
-  if (!index['root']) {
+  if (shouldCreateDefaultRootUser && !index['root']) {
     console.log('Initializing default root user...');
     const userId = 'root-dev-id';
     const userDir = path.join(USERS_DIR, userId);

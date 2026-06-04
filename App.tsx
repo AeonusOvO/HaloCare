@@ -50,7 +50,15 @@ const App: React.FC = () => {
     localStorage.removeItem('token');
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-[#f7f5f0] text-emerald-900">
+        <div className="motion-scale-in rounded-2xl border border-emerald-100 bg-white px-5 py-4 shadow-sm">
+          云脉珍心正在加载...
+        </div>
+      </div>
+    );
+  }
 
   if (!token || !user) {
     return <Auth onLogin={handleLogin} />;

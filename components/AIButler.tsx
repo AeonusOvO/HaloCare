@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, Bot, Sparkles, Loader2 } from 'lucide-react';
-import { callQwen } from '../services/qwenService';
+import { callModel } from '../services/modelService';
 import { Message } from '../types';
 
 const AIButler: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '您好，我是您的专属AI健康管家“小康”。今天感觉身体有什么不适，或者想聊聊养生话题吗？' }
+    { role: 'assistant', content: '您好，我是云脉健康管家。今天感觉身体有什么不适，或者想聊聊养生话题吗？' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const AIButler: React.FC = () => {
       
       const systemMsg: Message = {
         role: 'system',
-        content: `你是一个温柔、体贴、高度拟人化的中医AI健康管家“小康”。
+        content: `你是一个温柔、体贴、高度拟人化的中医健康管家“云脉管家”。
         你的性格：如沐春风，富有同理心，像一位相识多年的老朋友。
         你的任务：通过日常对话了解用户健康状况，提供中医养生建议，并在适当时候提醒用户注意饮食作息。
         在此次对话中，请展示出你的“思考过程”，分析用户的潜在情绪和健康隐患。
@@ -44,8 +44,7 @@ const AIButler: React.FC = () => {
 
       let assistantMsgContent = '';
       
-      // Use qwen-plus for text chat, it is faster and stable
-      await callQwen([systemMsg, ...context, userMsg], 'qwen-plus', 0.8, (content, thought) => {
+      await callModel([systemMsg, ...context, userMsg], 'qwen-plus', 0.8, (content, thought) => {
         assistantMsgContent = content;
         setReasoning(thought);
       });
@@ -61,13 +60,13 @@ const AIButler: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-[#fdfbf7]">
-      <div className="p-4 bg-emerald-800 text-white shadow-md flex items-center justify-between">
+      <div className="motion-enter p-4 bg-emerald-800 text-white shadow-md flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-full">
             <Bot size={24} />
           </div>
           <div>
-            <h2 className="font-bold text-lg">小康管家</h2>
+            <h2 className="font-bold text-lg">云脉管家</h2>
             <p className="text-xs text-emerald-100">24小时时刻守护您的健康</p>
           </div>
         </div>
@@ -76,14 +75,14 @@ const AIButler: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
+            <div className={`motion-card max-w-[85%] rounded-2xl p-4 shadow-sm ${
               msg.role === 'user' 
                 ? 'bg-emerald-600 text-white rounded-br-none' 
                 : 'bg-white border border-stone-200 text-stone-800 rounded-bl-none'
             }`}>
               {msg.role === 'assistant' && msg.reasoning_content && (
                 <div className="mb-2 text-xs text-stone-500 bg-stone-100 p-2 rounded border-l-2 border-emerald-500">
-                  <p className="font-bold flex items-center gap-1"><Sparkles size={10} /> 思考过程:</p>
+                  <p className="font-bold flex items-center gap-1"><Sparkles size={10} /> 推演过程:</p>
                   <p className="italic line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
                     {msg.reasoning_content}
                   </p>
@@ -107,7 +106,7 @@ const AIButler: React.FC = () => {
                 )}
                 <div className="flex items-center gap-2 text-stone-400">
                   <Loader2 className="animate-spin" size={16} />
-                  <span>小康正在组织语言...</span>
+                  <span>云脉管家正在组织语言...</span>
                 </div>
              </div>
           </div>
@@ -121,14 +120,14 @@ const AIButler: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="告诉小康您现在的感受..."
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="告诉云脉管家您现在的感受..."
             className="flex-1 p-3 border border-stone-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50"
           />
           <button 
             onClick={handleSend}
             disabled={loading}
-            className="p-3 bg-emerald-700 text-white rounded-full hover:bg-emerald-800 transition-colors disabled:opacity-50"
+            className="motion-press p-3 bg-emerald-700 text-white rounded-full hover:bg-emerald-800 transition-colors disabled:opacity-50"
           >
             <Send size={20} />
           </button>

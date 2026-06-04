@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { Bell, Check, Home, Plus, Shield, UserPlus, X } from 'lucide-react';
 
 interface FamilyManagerProps {
   token: string;
@@ -81,77 +82,107 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
   };
 
   return (
-    <div style={{ padding: '1rem', background: '#f9f9f9', borderRadius: '8px', marginTop: '1rem' }}>
-      <h3>家庭管理</h3>
-      {msg && <div style={{ marginBottom: '1rem', color: '#4CAF50' }}>{msg}</div>}
+    <div className="motion-enter rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <Home size={20} />
+          </div>
+          <div>
+            <h3 className="font-bold text-stone-900">家庭管理</h3>
+            <p className="text-xs text-stone-500 mt-0.5">家庭成员、邀请和权限</p>
+          </div>
+        </div>
+        {family && <span className="text-xs text-stone-400">ID: {family.id.slice(0, 8)}</span>}
+      </div>
 
-      {/* Notifications Section */}
-      {notifications.length > 0 && (
-        <div style={{ marginBottom: '2rem', border: '1px solid #ddd', padding: '1rem', borderRadius: '8px', background: 'white' }}>
-          <h4>🔔 消息通知</h4>
-          {notifications.map(n => (
-            <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <span>{n.fromUsername} 邀请你加入家庭</span>
-              <div>
-                <button onClick={() => handleRespond(n.id, true)} style={{ marginRight: '0.5rem', background: '#4CAF50', color: 'white', border: 'none', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>接受</button>
-                <button onClick={() => handleRespond(n.id, false)} style={{ background: '#f44336', color: 'white', border: 'none', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>拒绝</button>
-              </div>
-            </div>
-          ))}
+      {msg && (
+        <div className="motion-enter mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {msg}
         </div>
       )}
 
-      {/* Family Section */}
+      {notifications.length > 0 && (
+        <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-900">
+            <Bell size={16} /> 消息通知
+          </h4>
+          <div className="space-y-3">
+            {notifications.map(n => (
+              <div key={n.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm text-stone-700">{n.fromUsername} 邀请你加入家庭</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRespond(n.id, true)}
+                    className="motion-press inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    <Check size={14} /> 接受
+                  </button>
+                  <button
+                    onClick={() => handleRespond(n.id, false)}
+                    className="motion-press inline-flex items-center gap-1 rounded-full border border-stone-200 px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50"
+                  >
+                    <X size={14} /> 拒绝
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {family ? (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4>🏠 {family.name}</h4>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>ID: {family.id.slice(0, 8)}</span>
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="font-bold text-emerald-900">{family.name}</h4>
+            <span className="rounded-full bg-stone-100 px-2 py-1 text-xs text-stone-500">
+              {family.members.length} 位成员
+            </span>
           </div>
-          
-          <div style={{ marginTop: '1rem' }}>
-            <h5>成员列表:</h5>
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {family.members.map((m: any) => (
-                <li key={m.userId} style={{ padding: '0.5rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>
-                    {m.userId === user.id ? '我' : m.userId.slice(0, 8)} 
-                    <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', background: '#eee', padding: '2px 6px', borderRadius: '4px' }}>
-                      {m.role === 'admin' ? '管理员' : '成员'}
-                    </span>
+
+          <div className="rounded-2xl border border-stone-100 overflow-hidden">
+            {family.members.map((m: any) => (
+              <div key={m.userId} className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 last:border-b-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-stone-800">
+                    {m.userId === user.id ? '我' : m.userId.slice(0, 8)}
+                  </p>
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                    <Shield size={11} /> {m.role === 'admin' ? '管理员' : '成员'}
                   </span>
-                  
-                  {/* Only Admin can change roles, but not for themselves */}
-                  {user.role === 'admin' && m.userId !== user.id && (
-                    <select 
-                      value={m.role} 
-                      onChange={(e) => handleSetRole(m.userId, e.target.value)}
-                      style={{ marginLeft: '1rem', padding: '2px' }}
-                    >
-                      <option value="member">成员</option>
-                      <option value="admin">管理员</option>
-                    </select>
-                  )}
-                </li>
-              ))}
-            </ul>
+                </div>
+
+                {user.role === 'admin' && m.userId !== user.id && (
+                  <select
+                    value={m.role}
+                    onChange={(e) => handleSetRole(m.userId, e.target.value)}
+                    className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  >
+                    <option value="member">成员</option>
+                    <option value="admin">管理员</option>
+                  </select>
+                )}
+              </div>
+            ))}
           </div>
 
           {user.role === 'admin' && (
-            <div style={{ marginTop: '1rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
-              <h5>邀请新成员</h5>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="text" 
-                  placeholder="输入用户名" 
+            <div className="mt-5 border-t border-stone-100 pt-5">
+              <h5 className="mb-3 flex items-center gap-2 text-sm font-bold text-stone-800">
+                <UserPlus size={16} /> 邀请新成员
+              </h5>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="输入用户名"
                   value={inviteUsername}
                   onChange={(e) => setInviteUsername(e.target.value)}
-                  style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd' }}
+                  className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                 />
-                <button 
-                  onClick={handleInvite} 
+                <button
+                  onClick={handleInvite}
                   disabled={loading || !inviteUsername}
-                  style={{ background: '#2196F3', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
+                  className="motion-press rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
                 >
                   邀请
                 </button>
@@ -160,26 +191,24 @@ const FamilyManager: React.FC<FamilyManagerProps> = ({ token, user, onUpdate }) 
           )}
         </div>
       ) : (
-        <div>
-          <p>你还没有加入任何家庭。</p>
-          <div style={{ marginTop: '1rem' }}>
-            <h4>创建新家庭</h4>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input 
-                type="text" 
-                placeholder="家庭名称 (如: 快乐一家人)" 
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd' }}
-              />
-              <button 
-                onClick={handleCreateFamily} 
-                disabled={loading || !familyName}
-                style={{ background: '#4CAF50', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
-              >
-                创建
-              </button>
-            </div>
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-4">
+          <p className="mb-4 text-sm text-stone-600">你还没有加入任何家庭。</p>
+          <h4 className="mb-3 text-sm font-bold text-stone-800">创建新家庭</h4>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              placeholder="家庭名称，如：快乐一家人"
+              value={familyName}
+              onChange={(e) => setFamilyName(e.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+            <button
+              onClick={handleCreateFamily}
+              disabled={loading || !familyName}
+              className="motion-press inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+            >
+              <Plus size={15} /> 创建
+            </button>
           </div>
         </div>
       )}

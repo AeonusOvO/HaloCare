@@ -51,6 +51,17 @@
 4. 服务器同步必须遵循 `DEPLOY.md`、`SERVER_MANUAL.md` 和 `NGINX_CONFIG.md`，不得临时发明部署流程。
 5. 本地除构建、测试、语法检查、浏览器验证或必要排错外，不得启动开发服务、预览服务或后端服务；验证结束后必须停止本地服务，不能让本地进程常驻运行。
 
+## 生产服务器与自动部署
+
+1. 当前生产服务器为腾讯云香港 `43.163.215.149`，SSH 用户为 `ubuntu`，本地私钥文件为根目录 `Hongkong_ssh.pem`。历史上海服务器 `124.221.158.247`（内网 `10.0.0.12`）和 `ssh_shanghai.pem` 仅作迁移前记录，未得到明确指令不得继续部署到旧服务器。
+2. 生产域名为 `www.yunmai.life`，根域 `yunmai.life` 跳转到 `www.yunmai.life`。应用目录为 `/var/www/HaloCare`，后端 PM2 进程为 `halocare-backend`，监听 `127.0.0.1:4000`，Nginx 站点配置为 `/etc/nginx/sites-available/halocare`，证书目录为 `/etc/letsencrypt/live/www.yunmai.life/`。
+3. 同一台服务器已有艺策汇和龙虾系统，部署云脉珍心时不得破坏：艺策汇目录 `/var/www/yicehui`、`/opt/yicehui`，服务 `yicehui-docx.service`，域名 `yicehui.art`；龙虾目录 `/opt/openclaw`，服务 `openclaw-gateway.service`，本地端口 `127.0.0.1:18789`。除只读健康检查外，不得修改、删除、重启或覆盖这些系统的目录、服务和 Nginx 配置。
+4. 云脉珍心部署只允许操作 `/var/www/HaloCare`、PM2 进程 `halocare-backend`、Nginx 配置 `halocare` 及其证书相关配置；如需重载共享 Nginx，必须先执行 `sudo nginx -t` 且不得改动其他站点配置。
+5. 生产数据 `storage/` 和服务器端 `server/.env` 必须保留，不得被打包覆盖、提交到 GitHub 或写入文档。同步代码时应排除 `.env`、`.pem`、`storage/`、`node_modules/`、`dist/` 等本地/生产状态文件。
+6. 自动部署由 `.github/workflows/deploy.yml` 和根目录 `deploy.sh` 共同承担：GitHub Actions 负责打包干净源码并上传到服务器，服务器端保留生产 `storage/` 与 `server/.env` 后执行 `deploy.sh` 构建、安装依赖并通过 PM2 重载后端。
+7. GitHub Actions 需要配置仓库 Secrets：`SERVER_HOST=43.163.215.149`、`SERVER_USER=ubuntu`、`SERVER_SSH_KEY` 为 `Hongkong_ssh.pem` 对应私钥内容，可选 `SERVER_PORT=22`；不得把私钥明文写进仓库。
+8. 每次部署后至少验证：`https://www.yunmai.life` 返回 200，`https://www.yunmai.life/api/test` 返回成功，`pm2 status halocare-backend` 正常，`nginx.service` 正常；同时只读确认 `https://yicehui.art`、`yicehui-docx.service`、`openclaw-gateway.service` 仍正常。
+
 ## UI 与动效硬性要求
 
 1. 凡是新增或修改 UI，一律要加入符合物理直觉且高端雅气的动效；不得只做静态界面或只改颜色。

@@ -202,7 +202,7 @@ app.get('/api/photos/:userId/:filename', authenticateToken, (req, res) => {
 });
 
 
-// --- Existing Qwen Proxy ---
+// --- Model API Proxy ---
 const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
 const API_KEY = process.env.DASHSCOPE_API_KEY;
 
@@ -298,6 +298,7 @@ app.post('/api/chat/completions', async (req, res) => {
 });
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`Backend server running on http://localhost:${port}`);
+const host = process.env.HOST || '127.0.0.1';
+app.listen(port, host, () => {
+  console.log(`Backend server running on http://${host}:${port}`);
 });

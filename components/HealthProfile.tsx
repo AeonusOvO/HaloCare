@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { analyzeHealthProfile } from '../services/qwenService';
+import { analyzeHealthProfile } from '../services/modelService';
 import { UserProfile } from '../types';
-import { Activity, Moon, Utensils, Droplet, Thermometer, CheckCircle2, Loader2, LogOut, Users } from 'lucide-react';
+import { Activity, Loader2, LogOut, Moon, User, Users, Utensils } from 'lucide-react';
 import FamilyManager from './FamilyManager';
 
 interface Props {
@@ -60,9 +60,9 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-24">
+    <div className="p-5 md:p-6 max-w-4xl mx-auto pb-24 h-full overflow-y-auto">
       {/* Header with User Controls */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="motion-enter flex justify-between items-center mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-emerald-900 font-serif">个人中心</h2>
           <p className="text-sm text-stone-600">欢迎, {user.username}</p>
@@ -70,13 +70,13 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
         <div className="flex gap-2">
           <button 
             onClick={() => setShowFamily(!showFamily)}
-            className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg hover:bg-emerald-200"
+            className="motion-press flex items-center gap-1 px-3 py-2 bg-emerald-100 text-emerald-800 rounded-xl hover:bg-emerald-200"
           >
             <Users size={16} /> 家庭
           </button>
           <button 
             onClick={onLogout}
-            className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
+            className="motion-press flex items-center gap-1 px-3 py-2 bg-red-100 text-red-800 rounded-xl hover:bg-red-200"
           >
             <LogOut size={16} /> 退出
           </button>
@@ -90,11 +90,11 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
       )}
 
       {step === 1 ? (
-        <div className="space-y-6">
+        <div className="space-y-6 motion-enter motion-enter-delay-1">
           <h3 className="text-xl font-bold text-emerald-800">中医体质辨识</h3>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+          <div className="motion-card bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
             <h3 className="text-lg font-semibold mb-4 text-emerald-800 flex items-center gap-2">
-              <UserIcon /> 基本信息
+              <User size={20} /> 基本信息
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -122,7 +122,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
                   <button
                     key={g}
                     onClick={() => setFormData({...formData, gender: g})}
-                    className={`px-6 py-2 rounded-lg border ${
+                    className={`motion-press px-6 py-2 rounded-lg border ${
                       formData.gender === g 
                         ? 'bg-emerald-600 text-white border-emerald-600' 
                         : 'bg-white text-stone-600 border-stone-300'
@@ -135,7 +135,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+          <div className="motion-card bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
             <h3 className="text-lg font-semibold mb-4 text-emerald-800 flex items-center gap-2">
               <Activity size={20} /> 近期症状 (可多选)
             </h3>
@@ -144,7 +144,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
                 <button
                   key={sym}
                   onClick={() => toggleSymptom(sym)}
-                  className={`p-2 text-sm rounded-lg border transition-all ${
+                  className={`motion-press p-2 text-sm rounded-lg border transition-all ${
                     formData.symptoms.includes(sym)
                       ? 'bg-emerald-100 border-emerald-500 text-emerald-800 font-medium'
                       : 'bg-stone-50 border-stone-200 text-stone-600 hover:border-emerald-300'
@@ -165,20 +165,23 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
           <button
             onClick={handleSubmit}
             disabled={loading || !formData.name || !formData.age}
-            className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-900 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+            className="motion-press w-full py-4 bg-emerald-800 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-900 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
           >
-            {loading ? <><Loader2 className="animate-spin" /> 正在大模型推演中...</> : '生成健康画像'}
+            {loading ? <><Loader2 className="animate-spin" /> 正在生成健康画像...</> : '生成健康画像'}
           </button>
+          <p className="text-xs text-stone-500 leading-5 text-center">
+            本系统仅用于健康管理和科研演示，不作为临床诊断依据。
+          </p>
         </div>
       ) : (
-        <div>
+        <div className="motion-enter">
           <div className="mb-6 flex justify-between items-center">
             <h2 className="text-xl font-bold text-emerald-900">测评结果</h2>
-            <button onClick={() => setStep(1)} className="text-emerald-600 underline text-sm">重新测评</button>
+            <button onClick={() => setStep(1)} className="motion-press text-emerald-600 underline text-sm">重新测评</button>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-1 bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+            <div className="motion-card md:col-span-1 bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <Activity size={120} />
               </div>
@@ -190,7 +193,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
             </div>
 
             <div className="md:col-span-2 space-y-4">
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
+              <div className="motion-card bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
                 <div className="bg-amber-100 p-3 rounded-full h-fit text-amber-700">
                   <Utensils size={24} />
                 </div>
@@ -200,7 +203,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
+              <div className="motion-card bg-white p-5 rounded-xl shadow-sm border border-stone-200 flex gap-4">
                 <div className="bg-indigo-100 p-3 rounded-full h-fit text-indigo-700">
                   <Moon size={24} />
                 </div>
@@ -216,9 +219,5 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
     </div>
   );
 };
-
-const UserIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-);
 
 export default HealthProfile;

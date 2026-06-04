@@ -8,17 +8,17 @@ interface Props {
 
 const Community: React.FC<Props> = ({ onChangeView }) => {
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-24 h-full overflow-y-auto">
-      <header className="mb-6">
+    <div className="p-5 md:p-6 max-w-4xl mx-auto pb-24 h-full overflow-y-auto">
+      <header className="motion-enter mb-6">
         <h1 className="text-2xl font-serif font-bold text-emerald-900">中医社区</h1>
         <p className="text-stone-500 text-sm">分享养生心得，连接名医专家</p>
       </header>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="motion-enter motion-enter-delay-1 grid grid-cols-2 gap-4 mb-8">
         <button 
           onClick={() => onChangeView(AppView.PROFILE)}
-          className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col items-center gap-2 hover:bg-stone-50 transition-colors"
+          className="motion-card motion-press bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col items-center gap-2 hover:bg-stone-50 transition-colors"
         >
           <div className="p-3 bg-emerald-100 text-emerald-600 rounded-full">
             <FileText size={24} />
@@ -28,7 +28,7 @@ const Community: React.FC<Props> = ({ onChangeView }) => {
 
         <button 
           onClick={() => onChangeView(AppView.CONSULTATION)}
-          className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col items-center gap-2 hover:bg-stone-50 transition-colors"
+          className="motion-card motion-press bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col items-center gap-2 hover:bg-stone-50 transition-colors"
         >
           <div className="p-3 bg-amber-100 text-amber-600 rounded-full">
             <Users size={24} />
@@ -38,13 +38,13 @@ const Community: React.FC<Props> = ({ onChangeView }) => {
       </div>
 
       {/* Featured Doctors for Long-term Care */}
-      <div className="mb-8">
+      <div className="motion-enter motion-enter-delay-2 mb-8">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
            <UserPlus size={18} className="text-emerald-600"/> 签约家庭医生
         </h3>
         <div className="space-y-4">
            {[1, 2, 3].map(i => (
-             <div key={i} className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm flex items-center gap-4">
+             <div key={i} className="motion-card bg-white p-4 rounded-xl border border-stone-200 shadow-sm flex items-center gap-4">
                <img 
                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=doc${i}`} 
                  alt="Doctor" 
@@ -57,10 +57,10 @@ const Community: React.FC<Props> = ({ onChangeView }) => {
                  </div>
                  <p className="text-xs text-stone-500 mt-1 line-clamp-1">擅长：脾胃调理、失眠、亚健康干预...</p>
                  <div className="flex gap-2 mt-2">
-                    <button className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-full hover:bg-emerald-700">
+                    <button className="motion-press text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-full hover:bg-emerald-700">
                       签约咨询
                     </button>
-                    <button className="text-xs border border-stone-300 text-stone-600 px-3 py-1.5 rounded-full hover:bg-stone-50">
+                    <button className="motion-press text-xs border border-stone-300 text-stone-600 px-3 py-1.5 rounded-full hover:bg-stone-50">
                       查看详情
                     </button>
                  </div>
@@ -71,23 +71,23 @@ const Community: React.FC<Props> = ({ onChangeView }) => {
       </div>
 
       {/* Feed Placeholder */}
-      <div>
+      <div className="motion-enter motion-enter-delay-3">
          <h3 className="font-bold text-stone-800 mb-4">精选动态</h3>
          <div className="space-y-4">
            {[1, 2].map(i => (
-             <div key={i} className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+             <div key={i} className="motion-card bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                    <div className="w-8 h-8 rounded-full bg-stone-200"></div>
                    <span className="text-sm font-bold text-stone-700">养生达人{i}号</span>
                    <span className="text-xs text-stone-400 ml-auto">2小时前</span>
                 </div>
                 <p className="text-sm text-stone-600 mb-3 leading-relaxed">
-                  最近坚持练习八段锦，感觉睡眠质量明显改善了！推荐大家也试试。配合App里的食疗方案，效果更佳。#中医养生 #八段锦
+                  最近坚持练习八段锦，感觉睡眠质量明显改善了！推荐大家也试试。配合云脉珍心里的食疗方案，体验更完整。#中医养生 #八段锦
                 </p>
                 <div className="flex items-center gap-4 text-stone-400 text-xs">
-                   <button className="flex items-center gap-1 hover:text-rose-500"><Heart size={14}/> 24</button>
-                   <button className="flex items-center gap-1 hover:text-emerald-500"><MessageSquare size={14}/> 8</button>
-                   <button className="flex items-center gap-1 hover:text-emerald-500"><Share2 size={14}/> 分享</button>
+                   <button className="motion-press flex items-center gap-1 hover:text-rose-500"><Heart size={14}/> 24</button>
+                   <button className="motion-press flex items-center gap-1 hover:text-emerald-500"><MessageSquare size={14}/> 8</button>
+                   <button className="motion-press flex items-center gap-1 hover:text-emerald-500"><Share2 size={14}/> 分享</button>
                 </div>
              </div>
            ))}

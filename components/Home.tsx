@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppView, UserProfile } from '../types';
-import { Activity, Calendar, Stethoscope, PlayCircle, Music, Users, ScanFace, ChevronRight } from 'lucide-react';
+import { Activity, Calendar, ChevronRight, HeartPulse, Music, PlayCircle, ScanFace, Stethoscope, Users } from 'lucide-react';
 
 interface Props {
   userProfile: UserProfile | null;
@@ -11,48 +11,48 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
   const [isFamilyMode, setIsFamilyMode] = useState(false);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 overflow-y-auto pb-24 h-full">
-      <header className="flex justify-between items-center mb-6 mt-2">
+    <div className="p-5 md:p-6 max-w-4xl mx-auto space-y-6 overflow-y-auto pb-24 h-full">
+      <header className="motion-enter flex justify-between items-center mb-6 mt-2 gap-4">
         <div>
            <h1 className="text-2xl font-serif font-bold text-emerald-900">
              {userProfile ? `早安，${userProfile.name}` : '早安，请完善信息'}
            </h1>
            <p className="text-stone-500 text-sm mt-1">
-             {isFamilyMode ? '正在管理：父母的健康账户' : '您的专属中医健康管家 v1.0.1'}
+             {isFamilyMode ? '正在管理：父母的健康账户' : '云脉珍心四诊健康工作台 v1.0.1'}
            </p>
         </div>
         <button 
            onClick={() => setIsFamilyMode(!isFamilyMode)}
-           className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${isFamilyMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-stone-100 text-stone-500 border-stone-200'}`}
+           className={`motion-press px-3 py-2 rounded-full text-xs font-bold border transition-colors whitespace-nowrap ${isFamilyMode ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm' : 'bg-stone-100 text-stone-500 border-stone-200 hover:bg-stone-50'}`}
         >
            {isFamilyMode ? '切换至个人' : '切换至家庭'}
         </button>
       </header>
 
       {/* Hero Section: Smart Constitution Identification */}
-      <div className="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
+      <div className="motion-enter motion-enter-delay-1 bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10 motion-breathe">
            <ScanFace size={180} />
         </div>
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
-             <span className="bg-emerald-500/30 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">AI Core</span>
+             <span className="bg-emerald-500/30 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">四诊合参</span>
           </div>
-          <h2 className="text-xl font-bold mb-2">智能体质辨识</h2>
-          <p className="text-emerald-100 text-sm mb-6 max-w-[80%]">
-             通过望闻问切AI多模态分析，生成您的专属健康画像，获取精准调理方案。
+          <h2 className="text-xl font-bold mb-2">冠心病初筛与体质辨识</h2>
+          <p className="text-emerald-100 text-sm mb-6 max-w-[84%] leading-6">
+             通过望闻问切多模态分析，生成健康画像，提供辅助调理建议与风险提示。
           </p>
           <div className="flex gap-3">
              <button 
                onClick={() => onChangeView(AppView.AI_DIAGNOSIS)}
-               className="bg-white text-emerald-900 px-5 py-2 rounded-full font-bold text-sm shadow-lg hover:bg-emerald-50 transition-colors"
+               className="motion-press bg-white text-emerald-900 px-5 py-2 rounded-full font-bold text-sm shadow-lg hover:bg-emerald-50 transition-colors flex items-center gap-1"
              >
-               开始辨证
+               开始辨证 <ChevronRight size={15} />
              </button>
              {userProfile?.constitution && (
                 <button 
                   onClick={() => onChangeView(AppView.PROFILE)} // In a real app, this might go to a detailed report view
-                  className="bg-emerald-700/50 text-white border border-emerald-500/50 px-5 py-2 rounded-full font-bold text-sm hover:bg-emerald-700 transition-colors"
+                  className="motion-press bg-emerald-700/50 text-white border border-emerald-500/50 px-5 py-2 rounded-full font-bold text-sm hover:bg-emerald-700 transition-colors"
                 >
                   查看画像
                 </button>
@@ -62,14 +62,14 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
       </div>
 
       {/* Personalized Regimen */}
-      <div className="space-y-4">
+      <div className="motion-enter motion-enter-delay-2 space-y-4">
          <h3 className="font-bold text-stone-800 flex items-center gap-2">
            <Activity size={18} className="text-emerald-600"/> 个性化养生方案
          </h3>
          
          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Diet */}
-            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+            <div className="motion-card bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
                <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-amber-100 text-amber-600 rounded-lg"><Calendar size={18}/></div>
                   <span className="font-bold text-stone-700">时令食疗</span>
@@ -82,7 +82,7 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
             </div>
 
             {/* Schedule & Exercise */}
-            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+            <div className="motion-card bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
                <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><PlayCircle size={18}/></div>
                   <span className="font-bold text-stone-700">起居运动</span>
@@ -95,16 +95,16 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
             </div>
 
             {/* Emotion */}
-            <div className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+            <div className="motion-card bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
                <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Music size={18}/></div>
                   <span className="font-bold text-stone-700">情志调摄</span>
                </div>
                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer hover:text-emerald-600">
+                  <div className="motion-press flex items-center gap-2 text-sm text-stone-600 cursor-pointer hover:text-emerald-600">
                      <PlayCircle size={14}/> <span>五音疗愈·角调</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer hover:text-emerald-600">
+                  <div className="motion-press flex items-center gap-2 text-sm text-stone-600 cursor-pointer hover:text-emerald-600">
                      <PlayCircle size={14}/> <span>正念冥想引导</span>
                   </div>
                </div>
@@ -113,13 +113,13 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
       </div>
 
       {/* Multi-Doctor Consultation */}
-      <div className="bg-gradient-to-r from-stone-100 to-white p-5 rounded-2xl border border-stone-200">
+      <div className="motion-enter motion-enter-delay-3 bg-gradient-to-r from-stone-100 to-white p-5 rounded-2xl border border-stone-200">
          <div className="flex justify-between items-start mb-4">
             <div>
                <h3 className="font-bold text-stone-800 flex items-center gap-2 mb-1">
                  <Stethoscope size={18} className="text-emerald-600"/> 多医师云会诊
                </h3>
-               <p className="text-xs text-stone-500">三甲名医同步在线，智能比对诊断结果</p>
+               <p className="text-xs text-stone-500">多专家同步在线，智能比对辨证意见</p>
             </div>
             <Users className="text-stone-300" size={40} />
          </div>
@@ -140,10 +140,15 @@ const Home: React.FC<Props> = ({ userProfile, onChangeView }) => {
 
          <button 
            onClick={() => onChangeView(AppView.CONSULTATION)}
-           className="mt-4 w-full py-3 bg-white border border-stone-200 text-stone-700 font-bold rounded-xl shadow-sm hover:bg-stone-50 hover:border-emerald-300 hover:text-emerald-700 transition-all flex items-center justify-center gap-2"
+           className="motion-press mt-4 w-full py-3 bg-white border border-stone-200 text-stone-700 font-bold rounded-xl shadow-sm hover:bg-stone-50 hover:border-emerald-300 hover:text-emerald-700 transition-all flex items-center justify-center gap-2"
          >
            发起会诊 <ChevronRight size={16}/>
          </button>
+      </div>
+
+      <div className="motion-enter motion-enter-delay-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-900 flex items-start gap-2 leading-5">
+        <HeartPulse size={16} className="mt-0.5 flex-shrink-0 text-emerald-700" />
+        <span>本系统仅用于健康管理和科研演示，不作为临床诊断依据。</span>
       </div>
 
     </div>

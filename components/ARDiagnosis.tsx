@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
-import { callQwen } from '../services/qwenService';
+import { callModel } from '../services/modelService';
 import { api } from '../services/api';
 import { Message } from '../types';
 
@@ -16,6 +16,8 @@ enum DiagnosisStep {
 }
 
 type WangType = 'face' | 'tongue';
+
+const DEMO_PULSE_READING = '演示设备已连接：脉率 78 次/分，节律较齐；脉象模拟为弦细，按之略弱。';
 
 // Structured Report Interface
 interface DiagnosisReport {
@@ -71,7 +73,8 @@ const SlideTransition: React.FC<{
 
   return (
     <div
-      className={`absolute inset-0 transition-transform duration-500 ease-in-out transform ${translateClass}`}
+      aria-hidden={position !== 'center'}
+      className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out transform ${position !== 'center' ? 'pointer-events-none invisible opacity-0' : 'pointer-events-auto visible opacity-100'} ${translateClass}`}
     >
       {children}
     </div>
@@ -112,6 +115,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     other: '' // Other
   });
   const [qieData, setQieData] = useState(''); // Pulse input (optional)
+  const [pulseDemoConnected, setPulseDemoConnected] = useState(false);
   
   // Result State
   const [report, setReport] = useState<{content: string, reasoning: string, parsed?: DiagnosisReport} | null>(null);
@@ -210,7 +214,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
 
   const deleteHistory = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('确定要删除这条诊断记录吗？')) {
+    if (window.confirm('确定要删除这条分析记录吗？')) {
       const updatedHistory = history.filter(item => item.id !== id);
       setHistory(updatedHistory);
       
@@ -273,7 +277,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         setCameraErrorMsg('');
       } catch (err: any) {
         if (isCancelled) return;
-        console.error("Camera error:", err);
+        console.warn("Camera access warning:", err);
         setPermissionError(true);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
             setCameraErrorMsg('摄像头权限被拒绝，请允许访问。');
@@ -390,15 +394,16 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   };
 
   // --- Analysis Logic ---
-  const startAnalysis = async () => {
+  const startAnalysis = async (pulseOverride?: string) => {
     changeStep(DiagnosisStep.ANALYSIS);
     setRealtimeReasoning('');
     setRealtimeContent('');
     setIsConnected(false);
     setError(null);
+    const effectiveQieData = pulseOverride ?? qieData;
     
     const userPromptText = `
-    我正在进行中医“望闻问切”综合诊断。请根据以下信息进行辨证分析：
+    我正在进行中医“望闻问切”综合辨识。请根据以下信息进行辨证分析：
 
     1. 【望诊】(参考上传的图片):
        - 请分析面色、神态。
@@ -418,9 +423,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
        - 其他: ${inquiryData.other}
 
     4. 【切诊】(脉象):
-       ${qieData || '由于线上限制，无脉象数据。请基于望闻问三诊进行推断。'}
+       ${effectiveQieData || '当前未连接脉诊设备，未采集到脉象数据。请基于望闻问三诊进行推断。'}
 
-    请务必严格按照以下 JSON 格式输出诊断结果，不要包含任何 markdown 标记（如 \`\`\`json 或 \`\`\`），直接返回纯 JSON 字符串。JSON 结构如下：
+    请务必严格按照以下 JSON 格式输出辨识结果，不要包含任何 markdown 标记（如 \`\`\`json 或 \`\`\`），直接返回纯 JSON 字符串。JSON 结构如下：
     {
       "diagnosis": "核心辨证结论",
       "pathology": "核心病机分析",
@@ -444,9 +449,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
       let finalReasoning = '';
       
       // Use streaming to show progress
-      const res = await callQwen(
+      const res = await callModel(
         messages, 
-        'qwen-vl-max', // Corrected model
+        'qwen-vl-max',
         0.7, 
         (content, reasoning) => {
           finalContent = content;
@@ -481,6 +486,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
+  const connectDemoPulseAndAnalyze = () => {
+    setPulseDemoConnected(true);
+    setQieData(DEMO_PULSE_READING);
+    startAnalysis(DEMO_PULSE_READING);
+  };
+
   // --- Navigation Helper ---
   const goBack = () => {
     switch (step) {
@@ -506,7 +517,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             <h2 className="text-3xl font-serif font-bold mb-4">望闻问切 · 智能辨证</h2>
             <p className="text-stone-400 max-w-md mb-8 leading-relaxed text-center">
                 系统将引导您完成中医四诊流程。<br/>
-                利用大模型视觉能力分析面色与舌象，结合问诊信息，为您生成精准的健康报告。
+                利用大模型视觉能力分析面色与舌象，结合问诊信息，生成健康管理参考报告。
             </p>
             <button 
                 onClick={() => {
@@ -515,12 +526,13 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     setWenAudioText('');
                     setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
                     setQieData('');
+                    setPulseDemoConnected(false);
                     setStream(null); // Ensure stream is reset
                     changeStep(DiagnosisStep.WANG);
                 }}
                 className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
             >
-                开始新诊断 <ChevronRight />
+                开始新辨识 <ChevronRight />
             </button>
         </div>
 
@@ -675,7 +687,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
           </div>
           
           <p className="text-xs text-stone-400 bg-black/50 px-3 py-1 rounded-full">
-            {permissionError ? '请上传照片进行诊断' : '点击拍照或上传照片'}
+            {permissionError ? '请上传照片进行辨识' : '点击拍照或上传照片'}
           </p>
         </div>
       </div>
@@ -834,43 +846,89 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   const renderQie = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-stone-900 text-white text-center h-full">
-      <div className="w-full max-w-2xl flex items-center justify-between mb-8">
-        <button onClick={goBack} className="text-stone-400 hover:text-white p-2 bg-stone-800 rounded-full">
+    <div className="flex-1 flex flex-col items-center justify-center p-5 md:p-8 bg-stone-950 text-white text-center h-full overflow-y-auto">
+      <div className="w-full max-w-3xl flex items-center justify-between mb-6">
+        <button onClick={goBack} className="motion-press text-stone-400 hover:text-white p-2 bg-stone-900 border border-stone-800 rounded-full">
             <ChevronLeft size={20}/>
         </button>
         <span className="text-xs text-stone-500 font-bold uppercase">步骤 4/4</span>
         <div className="w-10"></div>
       </div>
 
-      <div className="mb-6 p-6 bg-stone-800 rounded-full">
-        <Activity size={64} className="text-stone-500" />
-      </div>
-      <h2 className="text-2xl font-serif font-bold mb-4">切诊 · 脉象</h2>
-      <div className="bg-stone-800/50 p-6 rounded-2xl max-w-md mb-8 border border-stone-700">
-        <p className="text-stone-300 text-sm leading-relaxed mb-4 flex items-start gap-2 text-left">
-          <Info className="flex-shrink-0 text-emerald-500 mt-0.5" size={16}/>
-          <span>
-            中医脉诊需要医者指端触觉感知脉搏的“位、数、形、势”。由于线上诊疗的物理限制，目前无法进行真实的切诊。
-          </span>
-        </p>
-        <p className="text-stone-400 text-sm text-left">
-          如果您之前有过医生的脉诊记录（如：脉浮紧、脉细数），请在下方填写，这将有助于大模型更精准的判断。
-        </p>
-        <input 
-          value={qieData}
-          onChange={e => setQieData(e.target.value)}
-          placeholder="例如：脉细数，按之无力 (选填)"
-          className="w-full mt-4 p-3 bg-black/30 border border-stone-600 rounded-lg text-white placeholder-stone-600 focus:border-emerald-500 outline-none"
-        />
-      </div>
+      <div className="motion-scale-in w-full max-w-3xl bg-stone-900/80 border border-stone-800 rounded-3xl p-5 md:p-7 shadow-2xl shadow-black/30">
+        <div className="flex flex-col md:flex-row md:items-start gap-6 text-left">
+          <div className="md:w-[280px] rounded-2xl border border-stone-700 bg-black/20 p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${pulseDemoConnected ? 'bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.7)]' : 'bg-amber-400'}`} />
+                <span className="text-sm font-bold">{pulseDemoConnected ? '演示设备已连接' : '待连接设备'}</span>
+              </div>
+              <HeartPulse className={pulseDemoConnected ? 'text-emerald-300' : 'text-stone-500'} size={22} />
+            </div>
 
-      <button 
-        onClick={startAnalysis}
-        className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all flex items-center gap-2"
-      >
-        <Zap size={20} className="fill-current"/> 生成四诊合参报告
-      </button>
+            <div className="h-28 rounded-2xl bg-stone-950 border border-stone-800 flex items-center justify-center gap-2 px-5 overflow-hidden">
+              {[28, 48, 76, 40, 66, 34, 88, 42, 62, 30].map((height, index) => (
+                <span
+                  key={index}
+                  className={`w-2 rounded-full ${pulseDemoConnected ? 'bg-emerald-400 pulse-line' : 'bg-stone-700'}`}
+                  style={{ height: `${height}%`, animationDelay: `${index * 80}ms` }}
+                />
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl bg-stone-800/80 p-3">
+                <span className="block text-stone-500 mb-1">设备</span>
+                <strong className="text-stone-200">{pulseDemoConnected ? 'DEMO-01' : '未接入'}</strong>
+              </div>
+              <div className="rounded-xl bg-stone-800/80 p-3">
+                <span className="block text-stone-500 mb-1">脉率</span>
+                <strong className="text-stone-200">{pulseDemoConnected ? '78 次/分' : '--'}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div className="mb-5">
+              <h2 className="text-2xl font-serif font-bold mb-2">切诊 · 脉象采集</h2>
+              <p className="text-stone-400 text-sm leading-6">
+                当前流程预留脉诊设备接入位。真实设备未连接时，可手动填写既往脉诊记录；演示模式会模拟设备已连接并直接进入报告生成。
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-stone-700 bg-stone-800/40 p-4 mb-4">
+              <p className="text-stone-300 text-sm leading-relaxed flex items-start gap-2">
+                <Info className="flex-shrink-0 text-emerald-400 mt-0.5" size={16}/>
+                <span>中医脉诊需要结合“位、数、形、势”等信息，本模块用于健康管理演示和辅助记录。</span>
+              </p>
+              <textarea
+                value={qieData}
+                onChange={e => {
+                  setQieData(e.target.value);
+                  setPulseDemoConnected(false);
+                }}
+                placeholder="例如：脉细数，按之无力；或使用演示连接自动写入模拟脉象。"
+                className="w-full mt-4 min-h-28 p-3 bg-black/30 border border-stone-600 rounded-xl text-white placeholder-stone-600 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-900/30 outline-none resize-none transition-all"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={connectDemoPulseAndAnalyze}
+                className="motion-press flex-1 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-2"
+              >
+                <HeartPulse size={19}/> 演示连接并跳过
+              </button>
+              <button
+                onClick={() => startAnalysis()}
+                className="motion-press flex-1 px-5 py-3 rounded-2xl bg-white text-emerald-950 hover:bg-emerald-50 font-bold shadow-lg flex items-center justify-center gap-2"
+              >
+                <Zap size={19} className="fill-current"/> 生成四诊合参报告
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -882,7 +940,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 <ChevronLeft size={20} className="text-stone-400"/>
             </button>
             <h2 className="text-xl font-serif font-bold text-emerald-400 flex items-center gap-2">
-            <FileText /> 诊断报告
+            <FileText /> 四诊合参报告
             </h2>
         </div>
         <button onClick={() => changeStep(DiagnosisStep.INTRO)} className="text-sm text-stone-400 hover:text-white flex items-center gap-1 transition-colors">
@@ -898,7 +956,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 // Error State UI
                 <div className="flex flex-col items-center justify-center bg-red-900/20 border border-red-500/50 p-8 rounded-2xl animate-fade-in max-w-md mx-auto mt-10">
                    <AlertTriangle size={48} className="text-red-500 mb-4" />
-                   <h3 className="text-xl font-bold text-red-400 mb-2">诊断分析中断</h3>
+                   <h3 className="text-xl font-bold text-red-400 mb-2">分析中断</h3>
                    <p className="text-stone-300 text-center mb-6">{error}</p>
                    <div className="flex gap-4">
                      <button 
@@ -908,7 +966,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                        返回上一步
                      </button>
                      <button 
-                        onClick={startAnalysis}
+                        onClick={() => startAnalysis()}
                         className="px-6 py-2 bg-red-600 hover:bg-red-500 rounded-full text-white font-bold flex items-center gap-2 transition-colors"
                      >
                        <RotateCcw size={16}/> 重试
@@ -925,7 +983,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     </div>
                     <div className="text-center">
                     <p className="text-xl font-bold text-emerald-100 mb-2">正在进行多模态辨证...</p>
-                    <p className="text-sm text-stone-500">Qwen-VL 大模型正在分析您的面色、舌象与问诊数据</p>
+                    <p className="text-sm text-stone-500">大模型正在分析您的面色、舌象与问诊数据</p>
                     </div>
                 </div>
                 
@@ -933,8 +991,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     <div className="flex items-center gap-2 text-emerald-500 mb-4 border-b border-stone-800 pb-2">
                     <Sparkles size={16} className={realtimeReasoning ? "animate-pulse" : ""}/> 
                     <span className="text-sm font-bold uppercase tracking-wider">
-                        {realtimeReasoning ? "AI 思考过程" : (
-                            realtimeContent ? "正在生成诊断报告..." : 
+                        {realtimeReasoning ? "模型推演过程" : (
+                            realtimeContent ? "正在生成健康报告..." :
                             (isConnected ? "已连接，大模型思考中..." : "连接云端计算中...")
                         )}
                     </span>
@@ -952,9 +1010,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         )}
                         <p className="text-stone-600 italic flex items-center gap-2">
                             <Loader2 size={14} className="animate-spin"/>
-                            {realtimeContent 
+                            {realtimeContent
                                 ? "深度推理完成，正在输出详细报告..."
-                                : (isConnected ? "Qwen-VL 正在分析图像特征..." : "正在建立安全连接 (压缩上传中)...")}
+                                : (isConnected ? "大模型正在分析图像特征..." : "正在建立安全连接 (压缩上传中)...")}
                         </p>
                         </div>
                     )}
@@ -1076,7 +1134,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   );
 
   return (
-    <div className="flex-1 relative overflow-hidden bg-stone-950 h-full">
+    <div className="flex-1 relative overflow-hidden bg-stone-950 h-full w-full min-h-0">
       <SlideTransition position={getSlidePosition(DiagnosisStep.INTRO)}>
         {renderIntro()}
       </SlideTransition>

@@ -1,15 +1,17 @@
 import { Message } from '../types';
-const BASE_URL = '/api/chat/completions';
+import { getApiBase } from './apiBase';
 
-export const callQwen = async (
+const API_BASE = getApiBase();
+const CHAT_COMPLETIONS_URL = `${API_BASE}/chat/completions`;
+
+export const callModel = async (
   messages: Message[],
-  model: string = 'qwen-vl-max', // Corrected from qwen3-vl-plus to stable qwen-vl-max
+  model: string = 'qwen-vl-max',
   temperature: number = 0.7,
   onStreamUpdate?: (content: string, reasoning: string) => void,
   onConnect?: () => void
 ): Promise<{ content: string; reasoning: string }> => {
   const controller = new AbortController();
-  // Set a 60-second timeout to prevent indefinite hanging
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
@@ -18,12 +20,12 @@ export const callQwen = async (
       messages: messages,
       stream: !!onStreamUpdate,
       temperature: temperature,
-      // Removed enable_thinking as it may cause issues with the standard VL endpoint
+      // Keep optional thinking controls disabled for compatibility with the multimodal endpoint.
       // enable_thinking: true, 
       // thinking_budget: 10240 
     };
 
-    const response = await fetch(BASE_URL, {
+    const response = await fetch(CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -38,9 +40,8 @@ export const callQwen = async (
       let errorMessage = 'API request failed';
       try {
         const errorData = await response.json();
-        // Extract specific DashScope/OpenAI error messages
         errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        console.error("Qwen API Error Data:", errorData);
+        console.error("Model API Error Data:", errorData);
       } catch (e) {
         errorMessage = `HTTP Error ${response.status} ${response.statusText}`;
       }
@@ -125,7 +126,7 @@ export const callQwen = async (
     }
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error("Qwen API Error:", error);
+    console.error("Model API Error:", error);
     if (error.name === 'AbortError') {
       throw new Error("请求超时，请检查网络或重试");
     }
@@ -150,8 +151,7 @@ export const analyzeHealthProfile = async (profile: any) => {
     只返回JSON，不要markdown标记。
   `;
   
-  // Use qwen-plus for pure text analysis as it's faster and cheaper, or qwen-vl-max
-  const result = await callQwen([{ role: 'user', content: prompt }], 'qwen-plus');
+  const result = await callModel([{ role: 'user', content: prompt }], 'qwen-plus');
   try {
     const cleanJson = result.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanJson);
