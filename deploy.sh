@@ -32,6 +32,9 @@ install_deps
 log "Building frontend"
 rm -rf dist
 npm run build
+chmod 755 "${APP_DIR}"
+find dist -type d -exec chmod 755 {} +
+find dist -type f -exec chmod 644 {} +
 
 log "Installing backend dependencies"
 cd server
@@ -41,6 +44,7 @@ if [ ! -f .env ]; then
   echo "Missing server/.env. Create it before deployment." >&2
   exit 1
 fi
+chmod 600 .env
 
 log "Starting or reloading backend with PM2"
 if pm2 describe "${BACKEND_NAME}" >/dev/null 2>&1; then
