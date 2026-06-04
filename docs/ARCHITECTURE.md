@@ -1,8 +1,8 @@
-# 盒家康 (HaloCare) 软件架构文档
+# 云脉珍心软件架构文档
 
 ## 1. 架构概览 (System Overview)
 
-盒家康采用典型的 **Client-Server (C/S)** 架构，前端基于 React 构建单页应用 (SPA)，并通过 Capacitor 封装为 Android 应用；后端使用 Node.js (Express) 提供 API 服务与数据持久化，同时集成阿里云 Qwen 大模型提供 AI 核心能力。
+云脉珍心采用典型的 **Client-Server (C/S)** 架构，前端基于 React 构建单页应用 (SPA)，并通过 Capacitor 封装为 Android 应用；后端使用 Node.js (Express) 提供 API 服务与数据持久化，同时通过 DashScope 兼容接口接入大模型能力。用户界面只展示“大模型”“模型推演”等中性表述，不展示具体模型供应商品牌。
 
 ```mermaid
 graph TD
@@ -45,12 +45,12 @@ graph TD
 
     %% External Services
     subgraph External [外部服务]
-        Qwen[阿里云 Qwen-VL (AI 诊断)]
+        Model[DashScope 兼容模型服务]
     end
 
     %% Connections
     Service -- HTTP/HTTPS --> API
-    TaskManager -- API Call --> Qwen
+    TaskManager -- API Call --> Model
     Client -- Capacitor Bridge --> Hardware[手机硬件 (Camera/Mic)]
 ```
 
@@ -73,7 +73,7 @@ graph TD
   - `/api/auth`: 用户认证 (JWT)
   - `/api/family`: 家庭组逻辑
   - `/api/profiles`: 健康档案管理
-  - `/api/diagnosis`: AI 诊断任务调度
+  - `/api/diagnosis`: 四诊辨证任务调度
 - **任务调度 (`taskManager.js`)**:
   - 处理耗时的 AI 推理请求。
   - 维护任务队列与状态 (Pending -> Processing -> Completed)。
@@ -84,11 +84,11 @@ graph TD
 - **结构**:
   - `users/`: 存储用户 Profile、设置、通知。
   - `users/[id]/health_profiles/`: 独立的健康档案文件。
-  - `users/[id]/diagnosis_records/`: AI 诊断历史记录。
+  - `users/[id]/diagnosis_records/`: 四诊报告历史记录。
   - `families/`: 家庭组关系数据。
 
-### 2.4 AI 集成 (AI Integration)
-- **模型**: Alibaba Cloud Qwen-Plus (文本) / Qwen-VL-Max (多模态)
+### 2.4 模型集成 (Model Integration)
+- **模型服务**: DashScope 兼容接口，前端通过同源 `/api` 调用后端代理，后端读取 `DASHSCOPE_API_KEY`
 - **流程**:
   1. 用户上传面部/舌苔照片或输入症状。
   2. 后端 TaskManager 接收请求。
@@ -121,13 +121,13 @@ sequenceDiagram
     S-->>C: 更新 UI (显示家庭模式按钮)
 ```
 
-### 3.2 AI 辅助诊断流程
+### 3.2 大模型辅助辨证流程
 ```mermaid
 sequenceDiagram
     participant U as User
     participant C as Client
     participant S as Server
-    participant AI as Qwen AI
+    participant M as Model Service
 
     U->>C: 上传照片/填写问卷
     C->>S: POST /api/diagnosis/start
@@ -139,8 +139,8 @@ sequenceDiagram
         S-->>C: 返回 Status (processing)
     end
 
-    S->>AI: 发送 Prompt + 图片
-    AI-->>S: 返回分析结果 (JSON)
+    S->>M: 发送 Prompt + 图片
+    M-->>S: 返回分析结果 (JSON)
     S->>S: 保存结果到 diagnosis_records/
 
     C->>S: GET /api/diagnosis/task/{id}
@@ -152,16 +152,16 @@ sequenceDiagram
 
 ## 4. 逻辑架构图 (Logical Architecture / Feature Map)
 
-以下脑图展示了盒家康系统的功能模块划分与层级结构：
+以下脑图展示了云脉珍心系统的功能模块划分与层级结构：
 
 ```mermaid
 mindmap
-  root((盒家康 App))
+  root((云脉珍心 App))
     首页 (Home)
       健康看板
         早安/午安/晚安 问候
         档案切换 (本人/家属)
-      AI 辨证入口 (Hero)
+      四诊辨证入口 (Hero)
         智能体质辨识
         开始诊断
       今日养生 (Regimen)
@@ -172,7 +172,7 @@ mindmap
         多医会诊
         名医预约
 
-    AI 辨证 (Diagnosis)
+    四诊辨证 (Diagnosis)
       多模态输入
         面诊 (Face)
         舌诊 (Tongue)

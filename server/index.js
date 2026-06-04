@@ -305,7 +305,7 @@ app.get('/api/photos/:userId/:filename', authenticateToken, (req, res) => {
 });
 
 
-// --- Existing Qwen Proxy ---
+// --- Existing model proxy ---
 const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
 const API_KEY = process.env.DASHSCOPE_API_KEY;
 

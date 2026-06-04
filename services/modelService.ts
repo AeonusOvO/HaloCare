@@ -3,7 +3,7 @@ import { getApiBase } from './apiBase';
 
 const BASE_URL = `${getApiBase()}/chat/completions`;
 
-export const callQwen = async (
+export const callProviderModel = async (
   messages: Message[],
   model: string = 'qwen-vl-max',
   temperature: number = 0.7,
@@ -41,7 +41,7 @@ export const callQwen = async (
         const errorData = await response.json();
         // Extract specific DashScope/OpenAI error messages
         errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        console.error("Qwen API Error Data:", errorData);
+        console.error("Model API Error Data:", errorData);
       } catch (e) {
         // Try to read text response if JSON parse fails
         try {
@@ -136,7 +136,7 @@ export const callQwen = async (
     }
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error("Qwen API Error:", error);
+    console.error("Model API Error:", error);
     if (error.name === 'AbortError') {
       throw new Error("请求超时，请检查网络或重试");
     }
@@ -144,7 +144,7 @@ export const callQwen = async (
   }
 };
 
-export const callModel = callQwen;
+export const callModel = callProviderModel;
 
 export const analyzeHealthProfile = async (profile: any) => {
   const prompt = `
@@ -163,8 +163,7 @@ export const analyzeHealthProfile = async (profile: any) => {
     只返回JSON，不要markdown标记。
   `;
 
-  // Use qwen-plus for pure text analysis as it's faster and cheaper, or qwen-vl-max
-  const result = await callQwen([{ role: 'user', content: prompt }], 'qwen-plus');
+  const result = await callProviderModel([{ role: 'user', content: prompt }], 'qwen-plus');
   try {
     const cleanJson = result.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanJson);
@@ -181,7 +180,7 @@ export const analyzeHealthProfile = async (profile: any) => {
 
 // --- New AI Diagnosis Flow Helpers ---
 
-export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: string) => {
+export const analyzeImageWithVisionModel = async (faceImage: string, tongueImage: string) => {
   const content: any[] = [
     { type: 'text', text: `你是一位资深中医专家。请仔细观察提供的面部和舌象照片，进行专业的“望诊”分析。
 
@@ -206,7 +205,7 @@ export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: str
   if (faceImage) content.push({ type: 'image_url', image_url: { url: faceImage } });
   if (tongueImage) content.push({ type: 'image_url', image_url: { url: tongueImage } });
 
-  return callQwen(
+  return callProviderModel(
     [{ role: 'user', content }],
     'qwen-vl-max',
     0.7,
@@ -215,9 +214,8 @@ export const analyzeImageWithQwenVL = async (faceImage: string, tongueImage: str
   );
 };
 
-export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescription: string) => {
-  // Qwen3-Omni-30B-A3B-Captioner only supports audio input and does not accept text prompts.
-  // We will get the audio caption/analysis first, and then combine it with user description in the final diagnosis.
+export const analyzeAudioWithAudioModel = async (audioBase64: string, userDescription: string) => {
+  // The current audio caption model only accepts audio input. User description is merged in the final report prompt.
   const content: any[] = [
     {
       type: 'input_audio',
@@ -228,8 +226,7 @@ export const analyzeAudioWithQwenOmni = async (audioBase64: string, userDescript
     }
   ];
 
-  // Using qwen3-omni-30b-a3b-captioner
-  return callQwen(
+  return callProviderModel(
     [{ role: 'user', content }],
     'qwen3-omni-30b-a3b-captioner',
     0.7
@@ -250,10 +247,10 @@ export const generateFinalDiagnosis = async (
 
     以下是四诊采集的详细数据：
 
-    1. 【望诊信息】(由 Healon 视觉分析):
+    1. 【望诊信息】(由视觉模型分析):
     ${wangResult}
 
-    2. 【闻诊信息】(由 Healon 听觉分析):
+    2. 【闻诊信息】(由音频模型分析):
     - 音频特征分析: ${wenResult}
     - 用户主观描述: ${wenUserDescription}
 
@@ -265,7 +262,7 @@ export const generateFinalDiagnosis = async (
 
     ---
     **任务要求**：
-    请综合分析以上信息，进行严谨的逻辑推演，生成一份专业的中医诊断报告。
+    请综合分析以上信息，进行严谨的逻辑推演，生成一份专业的中医健康管理报告。
 
     **注意**：
     1. **拒绝套话**：不要说“建议咨询医生”之类的废话，直接给出基于当前信息的专业判断。
@@ -285,7 +282,7 @@ export const generateFinalDiagnosis = async (
     }
     `;
 
-    return callQwen(
+    return callProviderModel(
         [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
         'qwen3-max',
         0.7,

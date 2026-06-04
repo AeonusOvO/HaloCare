@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, RefreshCw, AlertCircle, ScanEye, Zap, Mic, MicOff, ChevronRight, Check, Info, FileText, Activity, Ear, MessageSquare, Upload, Utensils, Moon, HandMetal, HeartPulse, Sparkles, Loader2, AlertTriangle, RotateCcw, ChevronLeft, Clock, Trash2, Calendar } from 'lucide-react';
-import { analyzeImageWithQwenVL, analyzeAudioWithQwenOmni } from '../services/modelService';
+import { analyzeImageWithVisionModel, analyzeAudioWithAudioModel } from '../services/modelService';
 import { api } from '../services/api';
 import { Message } from '../types';
 import { useDiagnosis, DiagnosisTask } from '../contexts/DiagnosisContext';
@@ -17,6 +17,9 @@ enum DiagnosisStep {
 }
 
 type WangType = 'face' | 'tongue';
+type PulseDeviceStatus = 'waiting' | 'connected';
+
+const DEMO_PULSE_DATA = '演示设备已连接：脉率 78 次/分，节律较齐；脉象模拟为弦细，按之略弱。';
 
 // Structured Report Interface
 interface DiagnosisReport {
@@ -182,6 +185,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     other: '' // Other
   });
   const [qieData, setQieData] = useState(''); // Pulse input (optional)
+  const [pulseDeviceStatus, setPulseDeviceStatus] = useState<PulseDeviceStatus>('waiting');
 
   // Result State
   const [report, setReport] = useState<{content: string, reasoning: string, parsed?: DiagnosisReport} | null>(null);
@@ -661,7 +665,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
   // REMOVED: useEffect dependency on step to trigger analysis
   // We will trigger it directly from the button click
 
-  const triggerAnalysis = async () => {
+  const triggerAnalysis = async (qieOverride?: string) => {
     if (isRunningAnalysis.current) return;
     isRunningAnalysis.current = true;
 
@@ -680,7 +684,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
           wenResult: wenResult || "（系统提示：闻诊分析尚未生成）",
           wenAudioText,
           inquiryData,
-          qieData,
+          qieData: qieOverride ?? qieData,
           images // Pass images to persist them in the result later
       };
 
@@ -718,6 +722,12 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
     }
   };
 
+  const handleDemoPulseSkip = () => {
+    setPulseDeviceStatus('connected');
+    setQieData(DEMO_PULSE_DATA);
+    window.setTimeout(() => triggerAnalysis(DEMO_PULSE_DATA), 220);
+  };
+
   // --- Renders ---
 
   const renderIntro = () => (
@@ -730,7 +740,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
             <h2 className="text-3xl font-serif font-bold mb-4">望闻问切 · 智能辨证</h2>
             <p className="text-stone-400 max-w-md mb-8 leading-relaxed text-center">
                 系统将引导您完成中医四诊流程。<br/>
-                利用大模型视觉能力分析面色与舌象，结合问诊信息，为您生成精准的健康报告。
+                利用大模型视觉能力分析面色与舌象，结合问诊信息，为您生成健康管理报告。
             </p>
             {activeTask && ['pending', 'processing'].includes(activeTask.status) ? (
                  <button
@@ -747,6 +757,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         setWenAudioText('');
                         setInquiryData({ hanRe: '', han: '', touShen: '', bian: '', yinShi: '', xiong: '', ke: '', other: '' });
                         setQieData('');
+                        setPulseDeviceStatus('waiting');
                         setStream(null); // Ensure stream is reset
                         // Clear any old task state
                         clearTask();
@@ -754,7 +765,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     }}
                     className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full font-bold text-lg shadow-lg shadow-emerald-900/50 transition-all flex items-center gap-2"
                 >
-                    开始新诊断 <ChevronRight />
+                    开始四诊辨证 <ChevronRight />
                 </button>
             )}
         </div>
@@ -987,7 +998,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
               // Trigger background Wang Analysis
               if (stepStatus.wang === 'idle' || stepStatus.wang === 'error') {
                   setStepStatus(prev => ({ ...prev, wang: 'loading' }));
-                  analyzeImageWithQwenVL(images.face, images.tongue)
+                  analyzeImageWithVisionModel(images.face, images.tongue)
                     .then(res => {
                         setWangResult(res.content);
                         setStepStatus(prev => ({ ...prev, wang: 'success' }));
@@ -1031,7 +1042,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         {/* Audio Recording Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-6">
             <label className="block font-bold text-stone-700 mb-3 flex justify-between">
-                <span>录音采集 (用以Healon分析)</span>
+                <span>录音采集（用于大模型听声息分析）</span>
                 {audioBase64 && <span className="text-emerald-600 text-xs flex items-center gap-1"><Check size={12}/> 已录制</span>}
             </label>
             <div className="flex flex-col items-center justify-center p-8 bg-stone-50 rounded-xl border-2 border-dashed border-stone-300">
@@ -1081,7 +1092,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 if (audioBase64) {
                     if (stepStatus.wen === 'idle' || stepStatus.wen === 'error') {
                         setStepStatus(prev => ({ ...prev, wen: 'loading' }));
-                        analyzeAudioWithQwenOmni(audioBase64, wenAudioText)
+                        analyzeAudioWithAudioModel(audioBase64, wenAudioText)
                             .then(res => {
                                 setWenResult(res.content);
                                 setStepStatus(prev => ({ ...prev, wen: 'success' }));
@@ -1172,11 +1183,30 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
         <div className="w-10"></div>
       </div>
 
-      <div className="mb-6 p-6 bg-stone-800 rounded-full">
-        <Activity size={64} className="text-stone-500" />
+      <div className={`mb-6 p-6 rounded-full border transition-all duration-300 ${pulseDeviceStatus === 'connected' ? 'bg-emerald-900/40 border-emerald-500/40 text-emerald-300' : 'bg-stone-800 border-stone-700 text-stone-500'}`}>
+        <HeartPulse size={64} />
       </div>
       <h2 className="text-2xl font-serif font-bold mb-4">切诊 · 脉象</h2>
-      <div className="bg-stone-800/50 p-6 rounded-2xl max-w-md mb-8 border border-stone-700">
+      <div className="bg-stone-800/50 p-6 rounded-2xl max-w-md mb-8 border border-stone-700 motion-scale-in">
+        <div className="mb-5 rounded-2xl border border-stone-700 bg-black/20 p-4 text-left">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-stone-200">脉诊演示设备</p>
+              <p className="mt-1 text-xs text-stone-500">当前无真实硬件接入</p>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${pulseDeviceStatus === 'connected' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-200 border border-amber-500/30'}`}>
+              {pulseDeviceStatus === 'connected' ? '演示已连接' : '待连接设备'}
+            </span>
+          </div>
+          <div className="mt-4 h-10 overflow-hidden rounded-xl bg-stone-950/70 border border-stone-700 relative">
+            <div className="absolute inset-y-0 left-0 w-full opacity-50">
+              <div className={`pulse-line h-full w-[140%] ${pulseDeviceStatus === 'connected' ? 'bg-[linear-gradient(90deg,transparent_0%,transparent_18%,rgba(16,185,129,0.0)_19%,rgba(16,185,129,0.75)_21%,rgba(16,185,129,0.0)_24%,transparent_40%,rgba(16,185,129,0.55)_43%,rgba(16,185,129,0)_46%,transparent_100%)]' : 'bg-[linear-gradient(90deg,transparent,rgba(120,113,108,0.32),transparent)]'}`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] text-stone-500">
+              {pulseDeviceStatus === 'connected' ? '演示脉搏信号已写入' : '等待脉诊设备连接'}
+            </div>
+          </div>
+        </div>
         <p className="text-stone-300 text-sm leading-relaxed mb-4 flex items-start gap-2 text-left">
           <Info className="flex-shrink-0 text-emerald-500 mt-0.5" size={16}/>
           <span>
@@ -1190,16 +1220,24 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
           value={qieData}
           onChange={e => setQieData(e.target.value)}
           placeholder="例如：脉细数，按之无力 (选填)"
-          className="w-full mt-4 p-3 bg-black/30 border border-stone-600 rounded-lg text-white placeholder-stone-600 focus:border-emerald-500 outline-none"
+          className="w-full mt-4 p-3 bg-black/30 border border-stone-600 rounded-lg text-white placeholder-stone-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
         />
       </div>
 
-      <button
-        onClick={triggerAnalysis}
-        className="px-10 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all flex items-center gap-2"
-      >
-        <Zap size={20} className="fill-current"/> 生成四诊合参报告
-      </button>
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <button
+          onClick={handleDemoPulseSkip}
+          className="motion-press px-8 py-4 bg-white text-emerald-950 rounded-full font-bold text-base shadow-lg hover:bg-emerald-50 transition-all flex items-center gap-2"
+        >
+          <HeartPulse size={20}/> 演示连接并跳过
+        </button>
+        <button
+          onClick={() => triggerAnalysis()}
+          className="motion-press px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-full font-bold text-base shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all flex items-center gap-2"
+        >
+          <Zap size={20} className="fill-current"/> 生成四诊合参报告
+        </button>
+      </div>
     </div>
   );
 
@@ -1211,7 +1249,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 <ChevronLeft size={20} className="text-stone-400"/>
             </button>
             <h2 className="text-xl font-serif font-bold text-emerald-400 flex items-center gap-2">
-            <FileText /> 诊断报告
+            <FileText /> 四诊合参报告
             </h2>
         </div>
         <button onClick={() => changeStep(DiagnosisStep.INTRO)} className="text-sm text-stone-400 hover:text-white flex items-center gap-1 transition-colors">
@@ -1227,7 +1265,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                 // Error State UI
                 <div className="flex flex-col items-center justify-center bg-red-900/20 border border-red-500/50 p-8 rounded-2xl animate-fade-in max-w-md mx-auto mt-10">
                    <AlertTriangle size={48} className="text-red-500 mb-4" />
-                   <h3 className="text-xl font-bold text-red-400 mb-2">诊断分析中断</h3>
+                   <h3 className="text-xl font-bold text-red-400 mb-2">辨证分析中断</h3>
                    <p className="text-stone-300 text-center mb-6">{error}</p>
                    <div className="flex gap-4">
                      <button
@@ -1237,7 +1275,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                        返回上一步
                      </button>
                      <button
-                        onClick={triggerAnalysis}
+                        onClick={() => triggerAnalysis()}
                         className="px-6 py-2 bg-red-600 hover:bg-red-500 rounded-full text-white font-bold flex items-center gap-2 transition-colors"
                      >
                        <RotateCcw size={16}/> 重试
@@ -1296,9 +1334,9 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     <div className="flex items-center gap-2 text-emerald-500 mb-4 border-b border-stone-800 pb-2">
                     <Sparkles size={16} className={realtimeReasoning ? "animate-pulse" : ""}/>
                     <span className="text-sm font-bold uppercase tracking-wider">
-                        {realtimeReasoning ? "Healon 思考过程" : (
-                            realtimeContent ? "正在生成诊断报告..." :
-                            (isConnected ? "已连接，Healon 思考中..." : "连接云端计算中...")
+                        {realtimeReasoning ? "模型推演过程" : (
+                            realtimeContent ? "正在生成健康管理报告..." :
+                            (isConnected ? "已连接，大模型正在辨证..." : "正在连接云端分析服务...")
                         )}
                     </span>
                     </div>
@@ -1316,8 +1354,8 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                         <p className="text-stone-600 italic flex items-center gap-2">
                             <Loader2 size={14} className="animate-spin"/>
                             {realtimeContent
-                                ? "深度推理完成，正在输出详细报告..."
-                                : (isConnected ? "Healon 正在分析特征..." : "正在建立安全连接 (压缩上传中)...")}
+                                ? "模型推演完成，正在输出详细报告..."
+                                : (isConnected ? "大模型正在分析特征..." : "正在建立安全连接（压缩上传中）...")}
                         </p>
                         </div>
                     )}
@@ -1376,7 +1414,7 @@ const ARDiagnosis: React.FC<{ userId?: string }> = ({ userId }) => {
                     {report.reasoning && (
                         <details className="group bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
                             <summary className="p-4 cursor-pointer flex items-center justify-between text-stone-400 hover:text-stone-300">
-                                <span className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold"><Zap size={14}/> 查看AI推演过程</span>
+                                <span className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold"><Zap size={14}/> 查看模型推演过程</span>
                                 <ChevronRight size={16} className="transform group-open:rotate-90 transition-transform"/>
                             </summary>
                             <div className="p-4 pt-0 text-stone-500 text-sm italic leading-relaxed border-t border-stone-800/50">

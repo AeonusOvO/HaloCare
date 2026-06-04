@@ -35,14 +35,14 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
     <div className="h-full flex flex-col overflow-hidden bg-[#f7f5f0] page-transition">
       <div className="flex-1 overflow-y-auto scrollbar-hide p-6 pb-24">
         {/* Header with User Controls */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="motion-enter flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold text-emerald-900 font-serif">个人中心</h2>
             <p className="text-sm text-stone-600">欢迎, {user.username}</p>
           </div>
           <button
             onClick={onLogout}
-            className="flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+            className="motion-press flex items-center gap-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
           >
             <LogOut size={16} /> 退出
           </button>
@@ -53,7 +53,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
           {/* My Health Profiles Card */}
           <button
             onClick={() => setShowProfiles(true)}
-            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
+            className="motion-card motion-press w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -72,7 +72,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
           {/* Family Management Toggle */}
           <button
             onClick={() => setShowFamily(!showFamily)}
-            className={`w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group ${showFamily ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+            className={`motion-card motion-press w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group ${showFamily ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center">
@@ -91,7 +91,7 @@ const HealthProfile: React.FC<Props> = ({ onProfileUpdate, token, user, onLogout
            {/* Icon Gallery (Dev Only) */}
            <button
             onClick={() => setShowIcons(true)}
-            className="w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
+            className="motion-card motion-press w-full bg-white p-6 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between hover:shadow-md transition-shadow group"
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center">

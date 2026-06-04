@@ -310,10 +310,10 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
           {/* History Selection */}
           <section>
             <h3 className="flex items-center gap-2 text-emerald-800 font-bold text-lg mb-4">
-              <FileText size={20} /> 关联历史诊断 (AI 记录)
+              <FileText size={20} /> 关联四诊报告
             </h3>
             {diagnosisHistory.length === 0 ? (
-              <p className="text-stone-400 text-sm">暂无历史诊断记录</p>
+              <p className="text-stone-400 text-sm">暂无历史四诊报告</p>
             ) : (
               <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto pr-2">
                 {diagnosisHistory.map(record => (
@@ -416,7 +416,7 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ token, onBack }) => {
                 {profile.linkedDiagnosisIds?.length > 0 && (
                   <div className="flex items-center gap-2 text-xs text-stone-500 bg-stone-50 p-2 rounded-lg">
                     <FileText size={14} />
-                    <span>关联了 {profile.linkedDiagnosisIds.length} 条历史诊断</span>
+                    <span>关联了 {profile.linkedDiagnosisIds.length} 条历史报告</span>
                   </div>
                 )}
               </div>

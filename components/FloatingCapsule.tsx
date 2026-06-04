@@ -17,7 +17,7 @@ const FloatingCapsule: React.FC<Props> = ({ onChangeView }) => {
   if (activeTask.status === 'processing') {
     switch (activeTask.step) {
         case 'init': stepText = "数据上传中..."; break;
-        case 'analysis': stepText = "AI 正在分析..."; break;
+        case 'analysis': stepText = "大模型正在辨证..."; break;
         case 'report': stepText = "生成报告中..."; break;
     }
   } else if (activeTask.status === 'completed') {

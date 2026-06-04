@@ -2,7 +2,7 @@
 
 ## 环境配置
 - 复制 `server/.env.example` 为 `server/.env`
-- 设置 `DASHSCOPE_API_KEY` 为阿里云 DashScope 的密钥
+- 设置 `DASHSCOPE_API_KEY` 为 DashScope 兼容接口密钥；后端不提供代码兜底密钥，未配置时模型请求会失败
 - 可选：设置 `PORT`（默认 `4000`）
 - 可选：设置 `HOST`（生产默认 `127.0.0.1`，仅允许 Nginx 本机反代）
 - 设置 `JWT_SECRET` 为随机长字符串

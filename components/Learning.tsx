@@ -35,7 +35,7 @@ const Learning: React.FC = () => {
         }`}
       >
         <div className="p-4 md:p-6 max-w-4xl mx-auto pb-24">
-          <header className="mb-8">
+          <header className="motion-enter mb-8">
             <h1 className="text-2xl font-serif font-bold text-emerald-900 mb-2">中医讲堂</h1>
             <p className="text-stone-500 text-sm">传承经典，科学养生。探索中医智慧，守护家人健康。</p>
           </header>
@@ -111,7 +111,7 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, label, icon }) =
   <button
     onClick={onClick}
     className={`
-      flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap
+      motion-press flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap
       ${active
         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200'
         : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
@@ -134,7 +134,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-stone-100 group cursor-pointer flex flex-col h-full"
+      className="motion-card bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-stone-100 group cursor-pointer flex flex-col h-full"
     >
       {/* Card Header / Image Placeholder */}
       <div className={`h-32 w-full flex items-center justify-center relative overflow-hidden ${isTheory ? 'bg-emerald-50' : 'bg-orange-50'}`}>
@@ -214,11 +214,11 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
     <div className="h-full bg-stone-50 overflow-y-auto pb-24">
       {/* Navbar */}
       <div className="bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <button onClick={onBack} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors">
+        <button onClick={onBack} className="motion-press p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors">
           <ArrowLeft size={20} />
         </button>
         <span className="font-bold text-stone-800 truncate max-w-[200px]">{course.title}</span>
-        <button className="p-2 -mr-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors">
+        <button className="motion-press p-2 -mr-2 text-stone-600 hover:bg-stone-100 rounded-full transition-colors">
           <Share2 size={20} />
         </button>
       </div>
@@ -249,14 +249,14 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
         <div className="flex space-x-4 border-t border-stone-100 pt-3">
           <button
             onClick={() => setIsLiked(!isLiked)}
-            className={`flex-1 py-2 flex items-center justify-center space-x-2 rounded-lg transition-colors ${isLiked ? 'bg-pink-50 text-pink-500' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}`}
+            className={`motion-press flex-1 py-2 flex items-center justify-center space-x-2 rounded-lg transition-colors ${isLiked ? 'bg-pink-50 text-pink-500' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}`}
           >
             <ThumbsUp size={18} fill={isLiked ? "currentColor" : "none"} />
             <span>点赞</span>
           </button>
           <button
             onClick={() => setIsFavorited(!isFavorited)}
-            className={`flex-1 py-2 flex items-center justify-center space-x-2 rounded-lg transition-colors ${isFavorited ? 'bg-yellow-50 text-yellow-500' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}`}
+            className={`motion-press flex-1 py-2 flex items-center justify-center space-x-2 rounded-lg transition-colors ${isFavorited ? 'bg-yellow-50 text-yellow-500' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}`}
           >
             <Heart size={18} fill={isFavorited ? "currentColor" : "none"} />
             <span>收藏</span>
@@ -271,7 +271,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`flex-1 py-3 text-sm font-medium relative ${
+              className={`motion-press flex-1 py-3 text-sm font-medium relative ${
                 activeTab === tab
                   ? 'text-emerald-600'
                   : 'text-stone-500 hover:text-stone-800'
@@ -315,7 +315,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
               <div
                 key={chapter.id}
                 onClick={() => setActiveChapter(chapter.id)}
-                className={`p-3 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
+                className={`motion-press p-3 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
                   activeChapter === chapter.id
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'hover:bg-stone-50 text-stone-700'
@@ -349,7 +349,7 @@ const CourseDetail: React.FC<CourseDetailProps> = ({ course, onBack }) => {
                 <MessageCircle size={16} className="mr-2" />
                 <span>写下你的评价...</span>
               </div>
-              <button className="bg-emerald-600 text-white p-2 rounded-full shadow-sm hover:bg-emerald-700 transition-colors">
+              <button className="motion-press bg-emerald-600 text-white p-2 rounded-full shadow-sm hover:bg-emerald-700 transition-colors">
                 <Send size={18} className="ml-0.5" />
               </button>
             </div>

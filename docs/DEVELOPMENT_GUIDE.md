@@ -1,4 +1,4 @@
-# 盒家康智慧中医·开发词典
+# 云脉珍心·开发词典
 
 ## 概览
 - 前端：React + Vite，Tailwind（CDN），lucide-react 图标
@@ -11,7 +11,7 @@
 - 应用框架：[App.tsx](file:///e:/Programs/HaloCare/App.tsx)
 - 组件目录：[components/](file:///e:/Programs/HaloCare/components)
 - 全局上下文：[DiagnosisContext.tsx](file:///e:/Programs/HaloCare/contexts/DiagnosisContext.tsx)
-- 服务接口：[api.ts](file:///e:/Programs/HaloCare/services/api.ts)、[qwenService.ts](file:///e:/Programs/HaloCare/services/qwenService.ts)
+- 服务接口：[api.ts](file:///e:/Programs/HaloCare/services/api.ts)、[modelService.ts](file:///e:/Programs/HaloCare/services/modelService.ts)
 - 类型定义：[types.ts](file:///e:/Programs/HaloCare/types.ts)
 - 样式与页面模板：[index.html](file:///e:/Programs/HaloCare/index.html)、[index.css](file:///e:/Programs/HaloCare/index.css)
 - 后端服务：[server/index.js](file:///e:/Programs/HaloCare/server/index.js)、[server/db.js](file:///e:/Programs/HaloCare/server/db.js)
@@ -30,9 +30,9 @@
   - 智能健康看板
   - 时令药膳推荐（每日水果抓取与滤镜）
   - 个性化运动方案与情志调摄
-  - 快速服务入口（AI 辨证、问诊、提醒、紧急联系人）
+  - 快速服务入口（四诊辨证、问诊、提醒、紧急联系人）
 - 健康档案：[HealthProfile.tsx](file:///e:/Programs/HaloCare/components/HealthProfile.tsx)
-- AI 诊断（AR）：[ARDiagnosis.tsx](file:///e:/Programs/HaloCare/components/ARDiagnosis.tsx)
+- 四诊辨证（AR）：[ARDiagnosis.tsx](file:///e:/Programs/HaloCare/components/ARDiagnosis.tsx)
 - 社区与会诊：[Community.tsx](file:///e:/Programs/HaloCare/components/Community.tsx)、[SmartConsultation.tsx](file:///e:/Programs/HaloCare/components/SmartConsultation.tsx)
 - 认证与登录：[Auth.tsx](file:///e:/Programs/HaloCare/components/Auth.tsx)
 

@@ -100,9 +100,12 @@ export const taskManager = {
   }
 };
 
-// Server-side Qwen orchestration
-async function callQwenAPI(messages, model = 'qwen-plus', temperature = 0.7) {
-    const API_KEY = process.env.DASHSCOPE_API_KEY || 'sk-eba2fce7c20c42af9acb2e2acfaa6760';
+// Server-side model orchestration
+async function callProviderModelAPI(messages, model = 'qwen-plus', temperature = 0.7) {
+    const API_KEY = process.env.DASHSCOPE_API_KEY;
+    if (!API_KEY) {
+        throw new Error('DASHSCOPE_API_KEY is not configured');
+    }
     const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
 
     const response = await fetch(BASE_URL, {
@@ -121,7 +124,7 @@ async function callQwenAPI(messages, model = 'qwen-plus', temperature = 0.7) {
 
     if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Qwen API Error (${response.status}): ${errText}`);
+        throw new Error(`Model API Error (${response.status}): ${errText}`);
     }
 
     const data = await response.json();
@@ -150,10 +153,10 @@ async function processDiagnosisTask(taskId) {
 
     以下是四诊采集的详细数据：
 
-    1. 【望诊信息】(由 Healon 视觉分析):
+    1. 【望诊信息】(由视觉模型分析):
     ${wangResult}
 
-    2. 【闻诊信息】(由 Healon 听觉分析):
+    2. 【闻诊信息】(由音频模型分析):
     - 音频特征分析: ${wenResult}
     - 用户主观描述: ${wenAudioText || '无'}
 
@@ -165,7 +168,7 @@ async function processDiagnosisTask(taskId) {
 
     ---
     **任务要求**：
-    请综合分析以上信息，进行严谨的逻辑推演，生成一份专业的中医诊断报告。
+    请综合分析以上信息，进行严谨的逻辑推演，生成一份专业的中医健康管理报告。
 
     **注意**：
     1. **拒绝套话**：不要说“建议咨询医生”之类的废话，直接给出基于当前信息的专业判断。
@@ -187,8 +190,7 @@ async function processDiagnosisTask(taskId) {
 
         taskManager.updateTask(taskId, { step: 'analysis', progress: 50 });
 
-        // Call Qwen-Max for final reasoning
-        const result = await callQwenAPI([{ role: 'user', content: prompt }], 'qwen-max');
+        const result = await callProviderModelAPI([{ role: 'user', content: prompt }], 'qwen-max');
 
         taskManager.updateTask(taskId, { step: 'report', progress: 90 });
 
